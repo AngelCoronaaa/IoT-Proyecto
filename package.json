@@ -1,0 +1,13 @@
+{
+  "name": "maqueta-3d-casa",
+  "version": "1.0.0",
+  "description": "Entorno de desarrollo para la maqueta 3D de la casa",
+  "private": true,
+  "scripts": {
+    "start": "live-server --port=5173 --no-browser",
+    "dev": "live-server --port=5173 --no-browser"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}
