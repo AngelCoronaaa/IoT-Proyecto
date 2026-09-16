@@ -390,7 +390,7 @@ function main(){
   const M = (color, extra) => new THREE.MeshStandardMaterial(Object.assign({ color: color, roughness: 0.9, metalness: 0.02 }, extra || {}));
   const mBlanco   = M(0xf6f3ed);
   const mHueso    = M(0xeae5db);
-  const mAzulTecho= new THREE.MeshStandardMaterial({ color: lin(0x191970), roughness: 0.8, metalness: 0.03 });   // midnight blue
+  const mCafeTecho= new THREE.MeshStandardMaterial({ color: lin(0x6b4226), roughness: 0.8, metalness: 0.03 });   // café
   const mGrisTecho= M(0x9b8a7a);
   const mMadera   = M(0x7d4b2c);
   const mMaderaCl = M(0xd6b078);
@@ -675,7 +675,7 @@ function main(){
   const largoFaldon = Math.hypot(HX + OVX, RISE) + 0.4;
   const profTecho = (HZF - HZB) + OVZB + OVZF;
   const zTecho = (HZB - OVZB + HZF + OVZF) / 2;
-  const matsFaldon = [mAzulTecho, mAzulTecho, mAzulTecho, mGrisTecho, mAzulTecho, mAzulTecho];
+  const matsFaldon = [mCafeTecho, mCafeTecho, mCafeTecho, mGrisTecho, mCafeTecho, mCafeTecho];
   const ESP_TECHO = 0.45;
 
   // faldón armado en piezas; el derecho deja el hueco del tragaluz.
@@ -707,7 +707,7 @@ function main(){
   const TRAGA = { s0: 1.8, s1: 8.4, z0: -8.0 - zTecho, z1: 0.4 - zTecho };
   const faldonDer = faldon(1, TRAGA);
   gTecho.add(faldonDer, faldon(-1));
-  gTecho.add(caja(1.0, 0.5, profTecho, mAzulTecho, 0, TOP + RISE + 0.1, zTecho, 'cumbrera'));
+  gTecho.add(caja(1.0, 0.5, profTecho, mCafeTecho, 0, TOP + RISE + 0.1, zTecho, 'cumbrera'));
 
   const tragaluz = new THREE.Group();
   const tS = TRAGA.s1 - TRAGA.s0, tZ = TRAGA.z1 - TRAGA.z0;
