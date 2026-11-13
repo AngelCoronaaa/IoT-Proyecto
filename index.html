@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Maqueta 3D — casa de dos niveles</title>
+<title>Maqueta 3D — casa victoriana</title>
 <style>
   :root{
     color-scheme:dark;
@@ -140,10 +140,9 @@
   <div class="cuerpo">
     <div class="grupo">
       <span>Capas</span>
-      <label class="fila"><input type="checkbox" id="c-techo" checked> Techo y tragaluz</label>
-      <label class="fila"><input type="checkbox" id="c-alto" checked> Segundo nivel</label>
-      <label class="fila"><input type="checkbox" id="c-muebles" checked> Muebles</label>
-      <label class="fila"><input type="checkbox" id="c-terraza" checked> Terraza y jardín</label>
+      <label class="fila"><input type="checkbox" id="c-techo" checked> Techo y crestería</label>
+      <label class="fila"><input type="checkbox" id="c-alto" checked> Entrepiso (buhardilla)</label>
+      <label class="fila"><input type="checkbox" id="c-porche" checked> Porche</label>
       <label class="fila"><input type="checkbox" id="c-sensores"> Sensores AirCare y cableado</label>
       <label class="fila"><input type="checkbox" id="c-girar"> Giro automático</label>
     </div>
@@ -154,6 +153,7 @@
         <button data-vista="tresc">Tres cuartos</button>
         <button data-vista="frente">Frente</button>
         <button data-vista="lado">Lado</button>
+        <button data-vista="atras">Atrás</button>
         <button data-vista="planta">Planta</button>
       </div>
     </div>
@@ -161,7 +161,7 @@
     <hr>
     <button class="exportar" id="btn-obj">Descargar modelo .obj</button>
     <p class="pie">Se descargan dos archivos (.obj y .mtl). Ábrelos juntos en Blender, SketchUp o Three.js.</p>
-    <p class="medidas">Escala: 1 unidad = 1 cm. Base 30 × 22 cm, cumbrera a 24.6 cm.<br>Bahía técnica trasera de 28 × 8.8 cm: ESP32 en protoboard de 830 puntos y módulo de 3 relevadores.</p>
+    <p class="medidas">Escala: 1 unidad = 1 cm (medidas estimadas de las fotos). Base 44 × 38 cm, casa 39.4 × 26.3 cm, cumbrera a 42 cm.<br>Casa abierta por detrás: la electrónica (ESP32 en protoboard de 830 puntos y 3 relevadores) va en la franja trasera de la planta baja; usa la vista «Atrás» para ver la instalación.</p>
   </div>
 </div>
 
@@ -213,18 +213,34 @@
 <script>
 function main(){
   // ============================================================
-  //  Dimensiones (cm)
+  //  Dimensiones (cm) — estimadas a partir de las fotos de la maqueta
   // ============================================================
-  const BW = 30, BD = 22, BT = 0.9;        // base
-  const HX = 11.5;                          // medio ancho de la casa
-  const HZB = -11, HZF = 0;                 // muro trasero / frente de la casa
-  const T = 0.35;                           // espesor de muro
-  const H1 = 9.5, SLAB = 0.6, H2 = 9.0;     // alturas
-  const TOP = H1 + SLAB + H2;               // 19.1 -> altura de alero
-  const RISE = 5.5;                         // altura de cumbrera sobre alero
-  const OVX = 1.2, OVZB = 1.0, OVZF = 1.6;  // voladizos del techo
-  const ANG = Math.atan2(RISE, HX + OVX);   // pendiente del techo
-  const ZC = (HZB + HZF) / 2;
+  const T = 0.3;                            // espesor del MDF (3 mm)
+  const HX = 19.4;                          // medio ancho interior (ancho exterior 39.4)
+  const HZB = -13.15, HZF = 12.85;          // borde trasero (abierto) / cara interior del muro frontal
+  const ZF = HZF + T;                       // cara exterior del frente
+  const ZC = (HZB + ZF) / 2;                // eje de la cumbrera (z = 0)
+  const DH = (ZF - HZB) / 2;                // medio fondo de la casa
+  const H1 = 17.8, SLAB = 0.6;              // altura libre de planta baja y entrepiso
+  const yA = H1 + SLAB;                     // piso de la buhardilla (18.4)
+  const TOP = 19.4;                         // arranque del techo sobre los muros
+  const RISE = 22.2;                        // altura del techo (cara inferior) sobre TOP
+  const ESP = 0.4;                          // espesor de los faldones
+  const ANG = Math.atan2(RISE, DH);         // pendiente del techo principal (~59°)
+  const YR = TOP + RISE + ESP / Math.cos(ANG);   // cumbrera, cara exterior (~42.4)
+  const OVA = 1.0, OVG = 1.8;               // voladizos en aleros y en hastiales
+  const XR = HX + T + OVG;                  // medio largo de los faldones
+  const SL = (DH + OVA) / Math.cos(ANG);    // largo del faldón sobre la pendiente
+  // hastial frontal: medio ancho y altura de su alero, voladizo al frente
+  const CGX = 12.2, CGE = 17.0, OVC = 0.9;
+  const ANGC = Math.atan2(YR - 0.9 - CGE, CGX);
+  const ZFC = ZF + OVC;
+  // base y porche
+  const BT = 0.6;
+  const BW = 44, BZ0 = HZB - 1.3, BZ1 = ZF + 10.75;
+  const BD = BZ1 - BZ0;
+  const PZ = ZF + 8.6;                      // línea de postes del porche
+  const PR0 = 15.8, PR1 = 13.3, PL = 10.4;  // techo del porche: altura en el muro, en el alero y largo
 
   // ============================================================
   //  Escena, cámara, luces
@@ -234,9 +250,9 @@ function main(){
   const lin = (hex) => new THREE.Color(hex).convertSRGBToLinear();
   const FONDO = 0x0b0f1a;
   scene.background = new THREE.Color(FONDO);
-  scene.fog = new THREE.Fog(lin(FONDO), 90, 190);
+  scene.fog = new THREE.Fog(lin(FONDO), 170, 330);
 
-  const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 400);
+  const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 600);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(innerWidth, innerHeight);
@@ -248,22 +264,29 @@ function main(){
 
   scene.add(new THREE.HemisphereLight(0xdfe4ff, 0x2a2f40, 0.8));
   const sol = new THREE.DirectionalLight(0xfff2df, 0.95);
-  sol.position.set(26, 40, 24);
+  sol.position.set(42, 72, 40);
   sol.castShadow = true;
-  sol.shadow.mapSize.set(1024, 1024);
+  sol.shadow.mapSize.set(2048, 2048);
   sol.shadow.camera.near = 1;
-  sol.shadow.camera.far = 130;
-  sol.shadow.camera.left = -32; sol.shadow.camera.right = 32;
-  sol.shadow.camera.top = 36; sol.shadow.camera.bottom = -22;
+  sol.shadow.camera.far = 220;
+  sol.shadow.camera.left = -46; sol.shadow.camera.right = 46;
+  sol.shadow.camera.top = 50; sol.shadow.camera.bottom = -40;
   sol.shadow.bias = -0.0012;
   scene.add(sol);
   const relleno = new THREE.DirectionalLight(0xdfe7ff, 0.32);
-  relleno.position.set(-24, 14, -18);
+  relleno.position.set(-40, 24, -32);
   scene.add(relleno);
+  // luz suave dentro de cada nivel para ver la instalación por la parte trasera abierta
+  [[0, 13, -4, 0.4, 50], [0, 30, -3, 0.3, 40]].forEach(function (l) {
+    const p = new THREE.PointLight(0xfff1dc, l[3], l[4]);
+    p.position.set(l[0], l[1], l[2]);
+    p.userData.noExport = true;
+    scene.add(p);
+  });
 
   // piso de apoyo (sombra de contacto)
   const suelo = new THREE.Mesh(
-    new THREE.PlaneGeometry(300, 300),
+    new THREE.PlaneGeometry(400, 400),
     new THREE.MeshStandardMaterial({ color: lin(0x10141f), roughness: 1 })
   );
   suelo.rotation.x = -Math.PI / 2;
@@ -287,126 +310,48 @@ function main(){
     return t;
   }
 
-  const texPiso = tex(256, 256, (g) => {
-    g.fillStyle = '#7f5233'; g.fillRect(0, 0, 256, 256);
-    for (let y = 0; y < 256; y += 28) {
-      g.fillStyle = 'rgba(0,0,0,' + (0.04 + ((y / 28) % 3) * 0.035) + ')';
-      g.fillRect(0, y, 256, 28);
+  // tejas de escama grabadas con láser sobre el MDF. Las piezas extruidas
+  // usan las coordenadas de su forma (cm) como UV: 1 mosaico = 2.6 × 2.4 cm
+  const texTeja = tex(256, 256, (g) => {
+    g.fillStyle = '#d3c2a2'; g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 900; i++) {
+      g.fillStyle = 'rgba(90,70,40,' + (Math.random() * 0.1).toFixed(3) + ')';
+      g.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
     }
-    g.fillStyle = 'rgba(40,20,5,.10)';
-    for (let i = 0; i < 180; i++) g.fillRect(Math.random() * 256, Math.random() * 256, 30 + Math.random() * 60, 1);
-    g.strokeStyle = 'rgba(235,212,184,.38)'; g.lineWidth = 1.4;
-    for (let y = 0; y < 256; y += 28) {
-      g.beginPath(); g.moveTo(0, y); g.lineTo(256, y); g.stroke();
-      const off = ((y / 28) % 2) ? 64 : 192;
-      g.beginPath(); g.moveTo(off, y); g.lineTo(off, y + 28); g.stroke();
-    }
-  }, 5, 4);
-
-  const texDuela = tex(256, 256, (g) => {
-    g.fillStyle = '#c49a6a'; g.fillRect(0, 0, 256, 256);
-    g.fillStyle = 'rgba(120,80,45,.18)';
-    for (let i = 0; i < 140; i++) g.fillRect(Math.random() * 256, Math.random() * 256, 30 + Math.random() * 60, 1);
-    g.strokeStyle = 'rgba(110,72,40,.35)'; g.lineWidth = 1.4;
-    for (let y = 0; y < 256; y += 22) { g.beginPath(); g.moveTo(0, y); g.lineTo(256, y); g.stroke(); }
-  }, 3, 2);
-
-  // papel tapiz de triángulos: rosa pálido arriba, franja azul a media altura
-  const texPapelTapiz = tex(512, 512, (g) => {
-    g.fillStyle = '#fbfaf7'; g.fillRect(0, 0, 512, 512);
-    const rosas = ['#f6d6dc', '#fbecef', '#f1cbd3', '#fdf6f3'];
-    const azules = ['#cde2ed', '#e3eef4', '#b9d6e5', '#f2f7f9'];
-    const W = 32, H = 34;
-    for (let fila = 0; fila * H < 512; fila++) {
-      const y = fila * H;
-      const pal = y < 230 ? rosas : y < 420 ? azules : null;
-      if (!pal) continue;
-      for (let col = -1; col * W / 2 < 512; col++) {
-        const x = col * W / 2;
-        const k = ((fila * 3 + col * 5 + ((col * col) % 3)) % pal.length + pal.length) % pal.length;
-        g.fillStyle = pal[k];
-        g.beginPath();
-        if ((((col + fila) % 2) + 2) % 2) { g.moveTo(x, y + H); g.lineTo(x + W, y + H); g.lineTo(x + W / 2, y); }
-        else { g.moveTo(x, y); g.lineTo(x + W, y); g.lineTo(x + W / 2, y + H); }
-        g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(92,64,38,.75)'; g.lineWidth = 3;
+    for (let f = 0; f < 2; f++) {
+      const y0 = f * 128;
+      for (let c = -1; c < 3; c++) {
+        const x0 = c * 128 + (f % 2) * 64;
+        g.beginPath(); g.arc(x0 + 64, y0 + 84, 56, Math.PI * 1.1, Math.PI * 1.9); g.stroke();
+        g.beginPath(); g.moveTo(x0 + 10, y0 + 66); g.lineTo(x0 + 10, y0 + 112); g.stroke();
       }
     }
-  }, 1, 1);
+  });
+  texTeja.repeat.set(1 / 2.6, 1 / 2.4);
 
-  // mosaico blanco con encaje gris (piso de cocina y baño)
-  const texPisoBlanco = tex(256, 256, (g) => {
-    g.fillStyle = '#ecebe6'; g.fillRect(0, 0, 256, 256);
-    g.strokeStyle = 'rgba(140,142,155,.5)'; g.lineWidth = 1.4;
-    for (let y = 0; y < 256; y += 32) for (let x = 0; x < 256; x += 32) {
-      g.strokeRect(x + 0.5, y + 0.5, 32, 32);
-      g.beginPath(); g.moveTo(x + 16, y + 4); g.lineTo(x + 28, y + 16); g.lineTo(x + 16, y + 28); g.lineTo(x + 4, y + 16); g.closePath(); g.stroke();
-      g.beginPath(); g.arc(x + 16, y + 16, 4.5, 0, Math.PI * 2); g.stroke();
-    }
-  }, 4, 2);
-
-  const texAzulejoRosa = tex(256, 256, (g) => {
-    g.fillStyle = '#f0b3c2'; g.fillRect(0, 0, 256, 256);
-    g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 2;
-    for (let i = 0; i <= 256; i += 24) {
-      g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 256); g.stroke();
-      g.beginPath(); g.moveTo(0, i); g.lineTo(256, i); g.stroke();
-    }
-  }, 3, 2);
-
-  const texAzulejoBlanco = tex(256, 256, (g) => {
-    g.fillStyle = '#eeece5'; g.fillRect(0, 0, 256, 256);
-    g.strokeStyle = 'rgba(170,165,155,.55)'; g.lineWidth = 1.6;
-    for (let i = 0; i <= 256; i += 26) {
-      g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 256); g.stroke();
-      g.beginPath(); g.moveTo(0, i); g.lineTo(256, i); g.stroke();
-    }
-  }, 3, 2);
-
-  const cuadroLoto = tex(128, 160, (g) => {
-    g.fillStyle = '#fffdf9'; g.fillRect(0, 0, 128, 160);
-    g.fillStyle = '#e8899f';
-    for (let i = 0; i < 8; i++) {
-      g.save(); g.translate(64, 92); g.rotate(i * Math.PI / 4);
-      g.beginPath(); g.ellipse(0, -26, 11, 27, 0, 0, Math.PI * 2); g.fill(); g.restore();
-    }
-    g.fillStyle = '#f6d98a'; g.beginPath(); g.arc(64, 92, 11, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = '#8aa77e'; g.lineWidth = 4; g.beginPath(); g.moveTo(64, 104); g.lineTo(64, 146); g.stroke();
-  }, 1, 1);
-
-  const cuadroGirasol = tex(128, 160, (g) => {
-    g.fillStyle = '#fffdf9'; g.fillRect(0, 0, 128, 160);
-    g.fillStyle = '#f0be3c';
-    for (let i = 0; i < 12; i++) {
-      g.save(); g.translate(64, 78); g.rotate(i * Math.PI / 6);
-      g.beginPath(); g.ellipse(0, -30, 9, 24, 0, 0, Math.PI * 2); g.fill(); g.restore();
-    }
-    g.fillStyle = '#6a4322'; g.beginPath(); g.arc(64, 78, 17, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = '#7f9a67'; g.lineWidth = 5; g.beginPath(); g.moveTo(64, 94); g.lineTo(64, 150); g.stroke();
-  }, 1, 1);
+  const texPersiana = tex(64, 128, (g) => {
+    g.fillStyle = '#d6c5a5'; g.fillRect(0, 0, 64, 128);
+    g.strokeStyle = 'rgba(92,64,38,.7)'; g.lineWidth = 2;
+    g.strokeRect(4, 4, 56, 120);
+    for (let y = 14; y < 118; y += 7) { g.beginPath(); g.moveTo(11, y); g.lineTo(53, y); g.stroke(); }
+  });
 
   // ============================================================
   //  Materiales
   // ============================================================
   const M = (color, extra) => new THREE.MeshStandardMaterial(Object.assign({ color: color, roughness: 0.9, metalness: 0.02 }, extra || {}));
-  const mBlanco   = M(0xf6f3ed);
-  const mHueso    = M(0xeae5db);
-  const mCafeTecho= new THREE.MeshStandardMaterial({ color: lin(0x6b4226), roughness: 0.8, metalness: 0.03 });   // café
-  const mGrisTecho= M(0x9b8a7a);
-  const mMadera   = M(0x7d4b2c);
-  const mMaderaCl = M(0xd6b078);
-  const mMaderaRail = M(0xc9a06a);
-  const mRojo     = M(lin(0x7c2a1c));
-  const mVino     = M(lin(0x3e110b));
-  const mAmarillo = M(0xe6da90, { roughness: 1 });
-  const mRosaCama = M(0xef9fb2);
-  const mAzul     = M(0xa9c7d8);
-  const mGris     = M(0x9a958d);
-  const mMetal    = new THREE.MeshStandardMaterial({ color: 0xbdc0c4, metalness: 0.65, roughness: 0.35 });
-  const mVidrio   = new THREE.MeshStandardMaterial({ color: 0x9fb4c4, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.22, depthWrite: false });
-  const mEspejo   = new THREE.MeshStandardMaterial({ color: 0xc9d6de, roughness: 0.15, metalness: 0.7 });
-  const mNegroCocina = M(0x222326, { roughness: 0.6 });
-  const mVerde    = M(0x6f8f55);
-  const mFoco     = new THREE.MeshStandardMaterial({ color: 0xfff6e0, emissive: 0xffd89a, emissiveIntensity: 0.9, roughness: 0.3 });
+  const mMDF      = M(lin(0xd4c3a3), { roughness: 0.92 });
+  const mCanto    = M(lin(0x5b3f27), { roughness: 0.95 });   // canto quemado por el corte láser
+  const mTeja     = new THREE.MeshStandardMaterial({ map: texTeja, roughness: 0.9 });
+  const mPersiana = new THREE.MeshStandardMaterial({ map: texPersiana, roughness: 0.9 });
+  mTeja.userData.hexExport = 'd3c2a2';
+  mPersiana.userData.hexExport = 'd6c5a5';
+  const mCanaleta = M(0xf2f1ec, { roughness: 0.6 });
+  const MDF  = [mMDF, mCanto];                                   // piezas extruidas: caras, cantos
+  const MDF6 = [mCanto, mCanto, mMDF, mMDF, mCanto, mCanto];     // tableros horizontales
+  const mPersianaF = [mMDF, mMDF, mMDF, mMDF, mPersiana, mPersiana];
+  const mPersianaL = [mPersiana, mPersiana, mMDF, mMDF, mMDF, mMDF];
 
   // ============================================================
   //  Utilidades de construcción
@@ -418,13 +363,6 @@ function main(){
     m.name = nombre || 'pieza';
     return m;
   }
-  function plano(w, h, mat, x, y, z, rx, ry) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
-    m.position.set(x, y, z);
-    m.rotation.set(rx || 0, ry || 0, 0);
-    m.receiveShadow = true;
-    return m;
-  }
   function cil(r, h, mat, x, y, z, seg) {
     const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg || 16), mat);
     m.position.set(x, y, z);
@@ -432,511 +370,330 @@ function main(){
     return m;
   }
 
+  // contornos para piezas cortadas con láser (todas en cm)
+  function rectP(p, x0, y0, x1, y1) { p.moveTo(x0, y0); p.lineTo(x1, y0); p.lineTo(x1, y1); p.lineTo(x0, y1); return p; }
+  function arcoP(p, x0, y0, x1, y1) {        // rectángulo rematado en medio punto; y1 = clave del arco
+    const r = (x1 - x0) / 2;
+    p.moveTo(x0, y0); p.lineTo(x1, y0); p.lineTo(x1, y1 - r);
+    p.absarc(x0 + r, y1 - r, r, 0, Math.PI, false);
+    return p;
+  }
+  const rectH = (x0, y0, x1, y1) => rectP(new THREE.Path(), x0, y0, x1, y1);
+  const arcoH = (x0, y0, x1, y1) => arcoP(new THREE.Path(), x0, y0, x1, y1);
+  function circH(x, y, r) { const p = new THREE.Path(); p.absarc(x, y, r, 0, Math.PI * 2, true); return p; }
+  function forma(puntos, huecos) {
+    const s = new THREE.Shape();
+    puntos.forEach(function (p, i) { if (i) s.lineTo(p[0], p[1]); else s.moveTo(p[0], p[1]); });
+    (huecos || []).forEach(function (h) { s.holes.push(h); });
+    return s;
+  }
+  // extruye una forma del plano xy local hacia +z local
+  function pieza(shape, esp, mats, nombre) {
+    const m = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: esp, bevelEnabled: false, curveSegments: 20 }), mats);
+    m.castShadow = true; m.receiveShadow = true;
+    m.name = nombre || 'pieza';
+    return m;
+  }
+  // pieza dibujada en (z, y) sobre un muro lateral: arranca en x0 y crece hacia -x
+  function aLado(obj, x0) { obj.rotation.y = -Math.PI / 2; obj.position.x = x0; return obj; }
+  // faldón: la forma se dibuja en (a lo largo, distancia s desde la cumbrera);
+  // d = dirección pendiente abajo, n = normal exterior, origen = cara exterior en s = 0
+  function faldonPieza(shape, d, n, origen, nombre) {
+    const m = pieza(shape, ESP, [mTeja, mCanto], nombre || 'techo');
+    const X = new THREE.Vector3().crossVectors(n, d);
+    m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, d, n.clone().negate()));
+    m.position.copy(origen);
+    return m;
+  }
+
   const gBase = new THREE.Group();
   const gBajo = new THREE.Group();
   const gAlto = new THREE.Group();
   const gTecho = new THREE.Group();
-  const gMuebles = new THREE.Group();
-  const gTerraza = new THREE.Group();
+  const gPorche = new THREE.Group();
   const gSensores = new THREE.Group();
-  scene.add(gBase, gBajo, gAlto, gTecho, gMuebles, gTerraza, gSensores);
+  scene.add(gBase, gBajo, gAlto, gTecho, gPorche, gSensores);
   gSensores.visible = false;
 
   // ============================================================
   //  Base
   // ============================================================
-  gBase.add(caja(BW, BT, BD, mBlanco, 0, -BT / 2, 0, 'base'));
-  const pisoTex = new THREE.MeshStandardMaterial({ map: texPiso, roughness: 0.85 });
-  const piso = plano(BW - 1.0, BD - 1.0, pisoTex, 0, 0.02, 0.2, -Math.PI / 2, 0);
-  piso.name = 'piso_terraza';
-  gBase.add(piso);
-
-  // ---- bahía técnica: cajón abierto detrás de la casa para la electrónica
-  const BZ0 = HZB - T, BZ1 = -20.15;          // límites en z del cajón
-  const BAH_Z = (BZ0 + BZ1) / 2, BAH_D = BZ0 - BZ1, BAH_W = 28;
-  gBase.add(caja(BAH_W, BT, BAH_D, mBlanco, 0, -BT / 2, BAH_Z, 'bahia_piso'));
-  gBase.add(plano(BAH_W - 1.2, BAH_D - 1.2, M(0xd9d3ca, { roughness: 0.95 }), 0, 0.02, BAH_Z, -Math.PI / 2, 0));
-  gBase.add(caja(BAH_W, 2.4, 0.5, mBlanco, 0, 1.2, BZ1 + 0.25, 'bahia_muro_tras'));
-  gBase.add(caja(0.5, 2.4, BAH_D, mBlanco, -BAH_W / 2 + 0.25, 1.2, BAH_Z, 'bahia_muro_izq'));
-  gBase.add(caja(0.5, 2.4, BAH_D, mBlanco, BAH_W / 2 - 0.25, 1.2, BAH_Z, 'bahia_muro_der'));
+  gBase.add(caja(BW, BT, BD, MDF6, 0, -BT / 2, (BZ0 + BZ1) / 2, 'base'));
 
   // ============================================================
-  //  Planta baja
+  //  Muros: la casa está abierta por detrás (planta baja y buhardilla)
   // ============================================================
-  const yA = H1 + SLAB;                       // nivel del entrepiso
-  const XDIV = -2.0;                          // muro divisorio cocina | baño
+  // cara inferior del techo principal sobre un punto z
+  function yTecho(z) { return TOP + (DH - Math.abs(z - ZC)) * Math.tan(ANG); }
 
-  // formas planas con huecos; las UV se normalizan a su caja para que
-  // las texturas cubran la pieza completa
-  function contorno(puntos, huecos) {
-    const s = new THREE.Shape();
-    puntos.forEach(function (p, i) { if (i) s.lineTo(p[0], p[1]); else s.moveTo(p[0], p[1]); });
-    s.closePath();
-    (huecos || []).forEach(function (h) {
-      const c = new THREE.Path();
-      c.absarc(h[0], h[1], h[2], 0, Math.PI * 2, true);
-      s.holes.push(c);
-    });
-    return s;
+  // ---- frente: puerta doble, dos ventanas y el hastial con ventana de arco
+  const PUERTA = { x0: -4.0, x1: 4.0, alto: 12.8 };
+  const VENT_F = [[-13.85, 4.6, -8.95, 10.2], [8.95, 4.6, 13.85, 10.2]];
+  const VENT_H = [-2.5, 20.4, 2.5, 29.4];                       // ventana del hastial frontal
+  const YAC = YR - ESP / Math.cos(ANGC);                        // vértice interior del hastial
+  const XG = (YAC - TOP) / Math.tan(ANGC);                      // donde el hastial corta la línea de alero
+  const muroFrente = pieza(forma([
+    [-HX - T, 0], [PUERTA.x0, 0], [PUERTA.x0, PUERTA.alto], [PUERTA.x1, PUERTA.alto], [PUERTA.x1, 0],
+    [HX + T, 0], [HX + T, TOP], [XG, TOP], [0, YAC], [-XG, TOP], [-HX - T, TOP]
+  ], [rectH.apply(null, VENT_F[0]), rectH.apply(null, VENT_F[1]), arcoH.apply(null, VENT_H)]), T, MDF, 'muro_frente');
+  muroFrente.position.z = HZF;
+  gBajo.add(muroFrente);
+
+  // ---- costados: hastiales con una ventana de arco por nivel
+  const VL = { z0: -2.6, z1: 2.6, bajo: [5.9, 14.7], alto: [20.2, 32.0] };
+  function perfilLado() {
+    return forma([[HZB, 0], [HZF, 0], [HZF, yTecho(HZF)], [ZC, yTecho(ZC)], [HZB, yTecho(HZB)]], [
+      arcoH(VL.z0, VL.bajo[0], VL.z1, VL.bajo[1]),
+      arcoH(VL.z0, VL.alto[0], VL.z1, VL.alto[1])
+    ]);
   }
-  function lamina(forma, mat, z, nombre) {
-    const geo = new THREE.ShapeGeometry(forma, 24);
-    geo.computeBoundingBox();
-    const bb = geo.boundingBox, uv = geo.attributes.uv, pos = geo.attributes.position;
-    for (let i = 0; i < uv.count; i++) {
-      uv.setXY(i, (pos.getX(i) - bb.min.x) / (bb.max.x - bb.min.x), (pos.getY(i) - bb.min.y) / (bb.max.y - bb.min.y));
-    }
-    const m = new THREE.Mesh(geo, mat);
-    m.position.z = z;
-    m.receiveShadow = true;
-    m.name = nombre;
-    return m;
-  }
+  gBajo.add(aLado(pieza(perfilLado(), T, MDF, 'muro_izq'), -HX));
+  gBajo.add(aLado(pieza(perfilLado(), T, MDF, 'muro_der'), HX + T));
 
-  // muro trasero en forma de pentágono (hastial). Como en la maqueta real,
-  // detrás de la cocina tiene un vano a ras de piso y cuatro perforaciones
-  const VANO = { x0: -9.4, x1: -2.6, alto: 4.2 };
-  const PERFORACIONES = [[-7.6, 8.0, 0.55], [-5.5, 9.0, 0.22], [-9.1, 6.9, 0.22], [-3.8, 6.4, 0.22]];
-  const perfil = contorno([
-    [-HX, 0], [VANO.x0, 0], [VANO.x0, VANO.alto], [VANO.x1, VANO.alto], [VANO.x1, 0],
-    [HX, 0], [HX, TOP], [0, TOP + RISE], [-HX, TOP]
-  ], PERFORACIONES);
-  const muroTrasero = new THREE.Mesh(new THREE.ExtrudeGeometry(perfil, { depth: T, bevelEnabled: false, curveSegments: 24 }), mBlanco);
-  muroTrasero.position.z = HZB - T;
-  muroTrasero.castShadow = true; muroTrasero.receiveShadow = true;
-  muroTrasero.name = 'muro_trasero';
-  gBajo.add(muroTrasero);
+  // ---- entrepiso y faja trasera bajo el alero
+  gAlto.add(caja(2 * HX, SLAB, HZF - HZB, MDF6, 0, H1 + SLAB / 2, (HZB + HZF) / 2, 'entrepiso'));
+  gAlto.add(caja(2 * HX, TOP - yA, T, mMDF, 0, (yA + TOP) / 2, HZB + T / 2, 'faja_trasera'));
 
-  // acabados interiores del muro trasero
-  gAlto.add(lamina(contorno([[-HX, yA], [HX, yA], [HX, TOP], [0, TOP + RISE], [-HX, TOP]]),
-    new THREE.MeshStandardMaterial({ map: texPapelTapiz, roughness: 0.95 }), HZB + 0.03, 'papel_tapiz'));
-  gBajo.add(lamina(contorno([
-    [-HX, 0], [VANO.x0, 0], [VANO.x0, VANO.alto], [VANO.x1, VANO.alto], [VANO.x1, 0], [XDIV, 0], [XDIV, H1], [-HX, H1]
-  ], PERFORACIONES), new THREE.MeshStandardMaterial({ map: texAzulejoRosa, roughness: 0.7 }), HZB + 0.03, 'azulejo_cocina'));
-  gBajo.add(plano(HX - XDIV, H1, new THREE.MeshStandardMaterial({ map: texAzulejoBlanco, roughness: 0.7 }), (XDIV + HX) / 2, H1 / 2, HZB + 0.03));
-  gBajo.add(plano(HX - XDIV, 3.8, M(0xdcaecb), (XDIV + HX) / 2, 1.9, HZB + 0.05));       // lambrín lila del baño
-
-  // piso interior de mosaico blanco (la terraza conserva la duela)
-  const pisoInt = plano(2 * HX, HZF - HZB, new THREE.MeshStandardMaterial({ map: texPisoBlanco, roughness: 0.8 }), 0, 0.04, ZC, -Math.PI / 2, 0);
-  pisoInt.name = 'piso_interior';
-  gBajo.add(pisoInt);
-
-  // muro lateral izquierdo, macizo de piso a alero
-  gBajo.add(caja(T, TOP, HZF - HZB, mBlanco, -HX - T / 2, TOP / 2, ZC, 'muro_izq'));
-
-  // entrepiso
-  gAlto.add(caja(2 * HX, SLAB, HZF - HZB, mHueso, 0, H1 + SLAB / 2, ZC, 'entrepiso'));
-  const duela = plano(2 * HX - 0.2, HZF - HZB - 0.2, new THREE.MeshStandardMaterial({ map: texDuela, roughness: 0.85 }), 0, yA + 0.02, ZC, -Math.PI / 2, 0);
-  gAlto.add(duela);
-
-  // costado derecho: abierto en planta baja (baño) y bastidor de ventana arriba
-  [[HZF - 0.3, 'poste_der_frente'], [HZB + 0.3, 'poste_der_fondo']].forEach(function (p) {
-    gBajo.add(caja(0.5, TOP, 0.5, mBlanco, HX - 0.2, TOP / 2, p[0], p[1]));
-  });
-  gAlto.add(caja(0.4, 0.4, HZF - HZB, mBlanco, HX - 0.2, yA + 2.4, ZC, 'ventana_der_travesano'));
-  gAlto.add(caja(0.4, 0.4, HZF - HZB, mBlanco, HX - 0.2, TOP - 0.2, ZC, 'ventana_der_cabezal'));
-  gAlto.add(caja(0.35, H2, 0.35, mBlanco, HX - 0.2, yA + H2 / 2, -5.5, 'ventana_der_parteluz'));
-
-  // segundo nivel: poste y barandal de madera hasta la llegada de la escalera
-  const XESC = 2.0;                            // x donde la escalera llega al entrepiso
-  gAlto.add(caja(0.45, H2, 0.45, mBlanco, -HX + 0.25, yA + H2 / 2, HZF - 0.25, 'poste_frente_izq'));
-  gAlto.add(caja(XESC + HX, 0.3, 0.3, mMaderaRail, (XESC - HX) / 2, yA + 2.8, HZF - 0.1, 'barandal_frente'));
-  gAlto.add(caja(0.3, 2.8, 0.3, mMaderaRail, XESC, yA + 1.4, HZF - 0.1, 'poste_barandal'));
-
-  // ---- cocina (planta baja, lado izquierdo)
-  // la barra queda bajo el extractor: el ventilador se apoya sobre ella
-  const barra = new THREE.Group();
-  barra.add(caja(6.4, 3.4, 2.4, mBlanco, 0, 1.7, 0, 'barra_cocina'));
-  [-2.1, 0, 2.1].forEach(function (x, i) {
-    barra.add(caja(1.8, 2.4, 0.06, mHueso, x, 1.5, 1.23, 'puerta_barra' + i));
-    barra.add(caja(0.5, 0.1, 0.1, mMetal, x, 2.4, 1.3, 'jaladera' + i));
-  });
-  barra.position.set(-7.8, 0, HZB + 1.6);
-  gBajo.add(barra);
-  gBajo.add(caja(2.0, 0.2, 1.5, mMetal, -9.6, 3.45, HZB + 1.6, 'tarja'));
-  gBajo.add(caja(2.6, 0.22, 1.9, mGris, -5.4, 3.5, HZB + 1.6, 'estufa'));
-  [[-6.1, -0.45], [-4.7, -0.45], [-6.1, 0.45], [-4.7, 0.45]].forEach(function (p) {
-    gBajo.add(cil(0.38, 0.06, mNegroCocina, p[0], 3.63, HZB + 1.6 + p[1], 16));
-  });
-  // refrigerador blanco junto al divisorio
-  gBajo.add(caja(2.1, 4.8, 1.8, mBlanco, -3.65, 2.4, HZB + 1.0, 'refrigerador'));
-  gBajo.add(caja(0.12, 1.8, 0.12, mMetal, -2.8, 2.6, HZB + 1.95, 'jaladera_refri'));
-  gBajo.add(caja(2.0, 0.05, 0.05, mHueso, -3.65, 3.4, HZB + 1.92, 'junta_refri'));
-  // tablas de picar colgadas
-  const mTabla = M(0x7a3b28);
-  gBajo.add(caja(1.3, 1.7, 0.14, mTabla, -10.0, 5.3, HZB + 0.12, 'tabla_1'));
-  gBajo.add(caja(0.35, 0.8, 0.14, mTabla, -10.0, 6.5, HZB + 0.12, 'mango_tabla_1'));
-  const tablaRedonda = cil(0.85, 0.14, mTabla, -8.3, 5.2, HZB + 0.12, 24);
-  tablaRedonda.rotation.x = Math.PI / 2;
-  gBajo.add(tablaRedonda);
-  gBajo.add(caja(0.3, 0.7, 0.14, mTabla, -8.3, 6.25, HZB + 0.12, 'mango_tabla_2'));
-
-  // ---- baño (planta baja, lado derecho, de fondo completo)
-  const PUERTA = { z0: -3.5, z1: -1.2, alto: 6.3 };
-  gBajo.add(caja(T, H1, PUERTA.z0 - HZB, mBlanco, XDIV, H1 / 2, (HZB + PUERTA.z0) / 2, 'divisorio_fondo'));
-  gBajo.add(caja(T, H1, HZF - PUERTA.z1, mBlanco, XDIV, H1 / 2, (PUERTA.z1 + HZF) / 2, 'divisorio_frente'));
-  gBajo.add(caja(T, H1 - PUERTA.alto, PUERTA.z1 - PUERTA.z0, mBlanco, XDIV, (H1 + PUERTA.alto) / 2, (PUERTA.z0 + PUERTA.z1) / 2, 'dintel'));
-  gBajo.add(caja(0.16, PUERTA.alto, PUERTA.z1 - PUERTA.z0, M(0xd9c7a0, { roughness: 0.7 }), XDIV + T / 2 + 0.08, PUERTA.alto / 2, (PUERTA.z0 + PUERTA.z1) / 2, 'puerta_bano'));
-  gBajo.add(cil(0.12, 0.2, mMetal, XDIV + T / 2 + 0.25, 3.1, PUERTA.z1 - 0.4, 10));
-
-  // inodoro contra el divisorio, mirando al costado abierto
-  const wc = new THREE.Group();
-  wc.add(caja(0.8, 2.3, 2.0, mBlanco, 0, 2.35, 0, 'wc_tanque'));
-  wc.add(caja(0.9, 0.2, 2.1, mBlanco, 0, 3.6, 0, 'wc_tapa_tanque'));
-  wc.add(caja(1.4, 1.5, 1.3, mBlanco, 1.0, 0.75, 0, 'wc_base'));
-  const taza = cil(0.95, 0.35, mBlanco, 1.35, 1.65, 0, 22);
-  taza.scale.set(1.25, 1, 1);
-  wc.add(taza);
-  wc.position.set(XDIV + T / 2 + 0.4, 0, -6.4);
-  gBajo.add(wc);
-
-  // espejo ovalado y lavabo en el muro trasero
-  const marcoEspejo = cil(1.0, 0.12, mMaderaCl, 8.4, 6.5, HZB + 0.1, 28);
-  marcoEspejo.rotation.x = Math.PI / 2;
-  marcoEspejo.scale.set(0.8, 1, 1.15);
-  gBajo.add(marcoEspejo);
-  const espejo = cil(0.84, 0.05, mEspejo, 8.4, 6.5, HZB + 0.18, 28);
-  espejo.rotation.x = Math.PI / 2;
-  espejo.scale.set(0.8, 1, 1.15);
-  gBajo.add(espejo);
-  gBajo.add(caja(2.0, 0.5, 1.3, mBlanco, 8.4, 4.4, HZB + 0.7, 'lavabo'));
-  gBajo.add(caja(0.8, 0.14, 0.9, mMetal, 8.4, 4.66, HZB + 0.75, 'tarja_lavabo'));
-
-  // bastidor blanco al frente del baño
-  [[XDIV + 0.2, 'bastidor_poste_1'], [4.8, 'bastidor_poste_2']].forEach(function (p) {
-    gBajo.add(caja(0.4, H1, 0.3, mBlanco, p[0], H1 / 2, HZF, p[1]));
-  });
-  gBajo.add(caja(HX - XDIV, 0.4, 0.3, mBlanco, (XDIV + HX) / 2, H1 - 0.2, HZF, 'bastidor_cabezal'));
-  gBajo.add(caja(HX - XDIV, 0.3, 0.3, mBlanco, (XDIV + HX) / 2, 7.0, HZF, 'bastidor_travesano'));
-  [1.4, 8.2].forEach(function (x, i) {
-    gBajo.add(caja(0.3, H1 - 7.4, 0.3, mBlanco, x, (H1 + 7.0) / 2, HZF, 'bastidor_montante' + i));
-  });
-
-  // focos colgantes de la planta baja
-  const focoPorche = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 12), mFoco);
-  focoPorche.position.set(-6.0, 8.1, 1.0);
-  focoPorche.name = 'foco_cocina';
-  gBajo.add(focoPorche);
-  gBajo.add(caja(0.06, 1.9, 0.06, mGris, -6.0, 9.4, 1.0, 'cordon_cocina'));
-  const focoBano = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 12), mFoco);
-  focoBano.position.set(6.4, 8.3, -2.6);
-  focoBano.name = 'foco_bano';
-  gBajo.add(focoBano);
-  gBajo.add(caja(0.06, 0.9, 0.06, mGris, 6.4, 9.1, -2.6, 'cordon_bano'));
-
-  // ---- escalera al segundo nivel: sube hacia la izquierda, frente al baño
-  const nPasos = 9, huella = 0.9, peralte = yA / nPasos;
-  const XBAJO = XESC + nPasos * huella;        // arranque (x = 10.1)
-  const ZESC = 1.75, ANCHO_ESC = 2.9;
-  for (let i = 0; i < nPasos; i++) {
-    const xc = XBAJO - (i + 0.5) * huella, ytop = (i + 1) * peralte;
-    gBajo.add(caja(huella + 0.12, 0.22, ANCHO_ESC, mMaderaRail, xc, ytop - 0.11, ZESC, 'huella' + i));
-    gBajo.add(caja(0.14, peralte - 0.22, ANCHO_ESC, mBlanco, XBAJO - i * huella, i * peralte + (peralte - 0.22) / 2, ZESC, 'peralte' + i));
-  }
-  // pasamanos paralelo a la pendiente, del lado de la terraza
-  const pend = peralte / huella;
-  const xa = XESC + 0.2, xb = XBAJO + 0.5;
-  const ya = yA + 2.8 - (xa - XESC - huella / 2) * pend, yb = yA + 2.8 - (xb - XESC - huella / 2) * pend;
-  const zRiel = ZESC + ANCHO_ESC / 2 - 0.15;
-  const pasamanos = caja(Math.hypot(xb - xa, ya - yb), 0.26, 0.26, mMaderaRail, (xa + xb) / 2, (ya + yb) / 2, zRiel, 'pasamanos');
-  pasamanos.rotation.z = -Math.atan2(ya - yb, xb - xa);
-  gBajo.add(pasamanos);
-  gBajo.add(caja(0.3, yb + 0.1, 0.3, mMaderaRail, xb, (yb + 0.1) / 2, zRiel, 'poste_arranque'));
-  gBajo.add(caja(0.26, ya - yA, 0.26, mMaderaRail, xa, (ya + yA) / 2, zRiel, 'poste_llegada'));
-
-  // ---- porche: muro lateral con tres vanos y pérgola blanca de lamas
-  const PZ = 8.0, PH = 10.4;                    // largo y altura del muro del porche
-  const xMuroP = -HX - T / 2;
-  // bandas horizontales: [alto, y centro, nombre]
-  [[0.5, 0.25, 'porche_zoclo'], [0.5, 7.15, 'porche_faja'], [0.9, PH - 0.45, 'porche_remate']].forEach(function (b) {
-    gBajo.add(caja(T, b[0], PZ, mBlanco, xMuroP, b[1], PZ / 2, b[2]));
-  });
-  gBajo.add(caja(T, 9.0, 0.4, mBlanco, xMuroP, 5.0, 0.2, 'porche_jamba_fondo'));
-  gBajo.add(caja(T, 9.0, PZ - 6.7, mBlanco, xMuroP, 5.0, (6.7 + PZ) / 2, 'porche_jamba_frente'));
-  gBajo.add(caja(T, 6.4, 0.35, mBlanco, xMuroP, 3.7, 3.575, 'porche_parteluz'));
-
-  const PX0 = -HX - 0.5, PX1 = 1.2, PL = 8.4, PY_FONDO = PH + 0.15, PY_FRENTE = PH + 0.15;   // plana, apoyada en el muro
-  const pergola = new THREE.Group();
-  const anchoP = PX1 - PX0;
-  pergola.add(caja(anchoP, 0.45, 0.5, mBlanco, 0, -0.05, PL / 2 - 0.25, 'pergola_frente'));
-  pergola.add(caja(anchoP, 0.3, 0.4, mBlanco, 0, 0, -PL / 2 + 0.2, 'pergola_fondo'));
-  pergola.add(caja(0.4, 0.3, PL, mBlanco, -anchoP / 2 + 0.2, 0, 0, 'pergola_lado_izq'));
-  pergola.add(caja(0.4, 0.3, PL, mBlanco, anchoP / 2 - 0.2, 0, 0, 'pergola_lado_der'));
-  for (let z = -PL / 2 + 0.85; z < PL / 2 - 0.6; z += 0.72) {
-    pergola.add(caja(anchoP - 0.5, 0.12, 0.38, mBlanco, 0, 0.16, z, 'lama'));
-  }
-  pergola.position.set((PX0 + PX1) / 2, (PY_FONDO + PY_FRENTE) / 2, PL / 2);
-  gBajo.add(pergola);
-  gBajo.add(caja(0.45, PY_FRENTE - 0.2, 0.45, mBlanco, PX1 - 0.4, (PY_FRENTE - 0.2) / 2, PL - 0.3, 'poste_porche'));
-
-  // ============================================================
-  //  Techo
-  // ============================================================
-  const largoFaldon = Math.hypot(HX + OVX, RISE) + 0.4;
-  const profTecho = (HZF - HZB) + OVZB + OVZF;
-  const zTecho = (HZB - OVZB + HZF + OVZF) / 2;
-  const matsFaldon = [mCafeTecho, mCafeTecho, mCafeTecho, mGrisTecho, mCafeTecho, mCafeTecho];
-  const ESP_TECHO = 0.45;
-
-  // faldón armado en piezas; el derecho deja el hueco del tragaluz.
-  // s: distancia sobre la pendiente medida desde la cumbrera
-  function faldon(signo, hueco) {
+  // ---- cancelería: marco y barrotes dentro del vano (plano xy local, espesor T)
+  function cancel(x0, y0, x1, y1, op) {
+    op = op || {};
     const g = new THREE.Group();
-    g.name = 'faldon_' + (signo > 0 ? 'der' : 'izq');
-    const z0 = -profTecho / 2, z1 = profTecho / 2;
-    function tramo(s0, s1, za, zb) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(s1 - s0, ESP_TECHO, zb - za), matsFaldon);
-      m.position.set(signo * ((s0 + s1) / 2 - largoFaldon / 2), 0, (za + zb) / 2);
-      m.castShadow = true; m.receiveShadow = true;
-      m.name = 'techo';
-      g.add(m);
+    g.name = 'cancel';
+    const b = 0.32, arco = !!op.arco;
+    const r = (x1 - x0) / 2, xc = (x0 + x1) / 2;
+    const ys = arco ? y1 - r : y1 - b;                          // tope de la parte recta
+    const ext = arco ? arcoP(new THREE.Shape(), x0, y0, x1, y1) : rectP(new THREE.Shape(), x0, y0, x1, y1);
+    ext.holes.push(arco ? arcoH(x0 + b, y0 + b, x1 - b, y1 - b) : rectH(x0 + b, y0 + b, x1 - b, y1 - b));
+    g.add(pieza(ext, T, MDF, 'marco_ventana'));
+    if (op.sinBarras) return g;
+    const e = 0.15, zc = T / 2, prof = T * 0.8;
+    const cols = op.cols || 2, filas = op.filas || 2;
+    const yi = y0 + b, alto = ys - yi;
+    for (let i = 1; i < cols; i++) {
+      g.add(caja(e, alto, prof, mMDF, x0 + (x1 - x0) * i / cols, yi + alto / 2, zc, 'parteluz'));
     }
-    if (!hueco) {
-      tramo(0, largoFaldon, z0, z1);
-    } else {
-      tramo(0, hueco.s0, z0, z1);
-      tramo(hueco.s1, largoFaldon, z0, z1);
-      tramo(hueco.s0, hueco.s1, z0, hueco.z0);
-      tramo(hueco.s0, hueco.s1, hueco.z1, z1);
+    for (let j = 1; j < filas; j++) {
+      g.add(caja(x1 - x0 - 2 * b, e, prof, mMDF, xc, yi + alto * j / filas, zc, 'travesano'));
     }
-    g.position.set(signo * (HX + OVX) / 2, TOP + RISE / 2, zTecho);
-    g.rotation.z = signo > 0 ? -ANG : ANG;
-    return g;
-  }
-  // tragaluz grande de tres paños, cerca del frente del faldón derecho
-  const TRAGA = { s0: 1.8, s1: 8.4, z0: -8.0 - zTecho, z1: 0.4 - zTecho };
-  const faldonDer = faldon(1, TRAGA);
-  gTecho.add(faldonDer, faldon(-1));
-  gTecho.add(caja(1.0, 0.5, profTecho, mCafeTecho, 0, TOP + RISE + 0.1, zTecho, 'cumbrera'));
-
-  const tragaluz = new THREE.Group();
-  const tS = TRAGA.s1 - TRAGA.s0, tZ = TRAGA.z1 - TRAGA.z0;
-  tragaluz.add(caja(tS + 0.5, 0.3, 0.3, mBlanco, 0, 0, -tZ / 2, 'marco_tragaluz_1'));
-  tragaluz.add(caja(tS + 0.5, 0.3, 0.3, mBlanco, 0, 0, tZ / 2, 'marco_tragaluz_2'));
-  tragaluz.add(caja(0.3, 0.3, tZ, mBlanco, -tS / 2, 0, 0, 'marco_tragaluz_3'));
-  tragaluz.add(caja(0.3, 0.3, tZ, mBlanco, tS / 2, 0, 0, 'marco_tragaluz_4'));
-  [-tZ / 6, tZ / 6].forEach(function (z, i) {
-    tragaluz.add(caja(tS, 0.24, 0.26, mBlanco, 0, 0, z, 'montante_' + i));
-  });
-  tragaluz.add(caja(tS, 0.06, tZ, mVidrio, 0, 0.05, 0, 'vidrio_tragaluz'));
-  tragaluz.position.set((TRAGA.s0 + TRAGA.s1) / 2 - largoFaldon / 2, ESP_TECHO / 2 + 0.05, (TRAGA.z0 + TRAGA.z1) / 2);
-  faldonDer.add(tragaluz);
-
-  // foco colgante del ático
-  const cordon = caja(0.08, 5.2, 0.08, mGris, 0, TOP + RISE - 2.6, -3.6, 'cordon');
-  gAlto.add(cordon);
-  gAlto.add(caja(0.9, 0.7, 0.9, M(0xc9a227, { metalness: 0.6, roughness: 0.35 }), 0, TOP + RISE - 5.4, -3.6, 'casquillo'));
-  const foco = new THREE.Mesh(new THREE.SphereGeometry(0.95, 20, 16), mFoco);
-  foco.position.set(0, TOP + RISE - 6.4, -3.6);
-  foco.name = 'foco';
-  gAlto.add(foco);
-  const luzFoco = new THREE.PointLight(0xffd9a0, 0.55, 26);
-  luzFoco.position.copy(foco.position);
-  luzFoco.userData.noExport = true;
-  gAlto.add(luzFoco);
-
-  // ============================================================
-  //  Muebles del segundo nivel
-  // ============================================================
-  // cama: base café, ropa azul pálido y cabecera rosa con hombros redondeados
-  const cama = new THREE.Group();
-  cama.add(caja(8.4, 1.3, 6.2, mMadera, 0, 0.65, 0, 'base_cama'));
-  cama.add(caja(8.0, 1.0, 5.8, M(0xe4eaee), 0, 1.8, 0.1, 'colchon'));
-  cama.add(caja(8.1, 0.32, 3.4, M(0x9db6c6), 0, 2.4, 1.3, 'cobija'));
-  cama.add(caja(3.0, 0.5, 1.3, M(0xc9d8e1), -1.9, 2.5, -2.0, 'almohada_1'));
-  cama.add(caja(3.0, 0.5, 1.3, M(0xc9d8e1), 1.9, 2.5, -2.0, 'almohada_2'));
-  const cabForma = new THREE.Shape();
-  cabForma.moveTo(-4.5, 0);
-  cabForma.lineTo(4.5, 0);
-  cabForma.lineTo(4.5, 3.2);
-  cabForma.quadraticCurveTo(4.5, 3.7, 4.0, 3.7);
-  cabForma.lineTo(3.2, 3.7);
-  cabForma.quadraticCurveTo(2.6, 3.7, 2.6, 4.1);
-  cabForma.quadraticCurveTo(2.6, 4.6, 2.0, 4.6);
-  cabForma.lineTo(-2.0, 4.6);
-  cabForma.quadraticCurveTo(-2.6, 4.6, -2.6, 4.1);
-  cabForma.quadraticCurveTo(-2.6, 3.7, -3.2, 3.7);
-  cabForma.lineTo(-4.0, 3.7);
-  cabForma.quadraticCurveTo(-4.5, 3.7, -4.5, 3.2);
-  cabForma.closePath();
-  const cabecera = new THREE.Mesh(new THREE.ExtrudeGeometry(cabForma, { depth: 0.5, bevelEnabled: false, curveSegments: 10 }), mRosaCama);
-  cabecera.position.z = -3.6;
-  cabecera.castShadow = true;
-  cabecera.name = 'cabecera';
-  cama.add(cabecera);
-  cama.position.set(-0.9, yA, -7.3);
-  gMuebles.add(cama);
-
-  // cómoda baja de cajones con un marco (espejo) parado encima
-  const comoda = new THREE.Group();
-  comoda.add(caja(5.4, 2.4, 2.0, mMadera, 0, 1.2, 0, 'comoda'));
-  for (let f = 0; f < 2; f++) for (let c = 0; c < 3; c++) {
-    comoda.add(caja(1.55, 0.95, 0.08, M(0x6a3f24), -1.75 + c * 1.75, 0.65 + f * 1.1, 1.02, 'cajon'));
-    comoda.add(cil(0.1, 0.1, mBlanco, -1.75 + c * 1.75, 0.65 + f * 1.1, 1.1, 8));
-  }
-  comoda.add(caja(2.6, 3.0, 0.35, M(0x6a4028), -0.3, 3.9, -0.5, 'marco_espejo'));
-  comoda.add(caja(2.1, 2.5, 0.1, M(0x1d2433, { roughness: 0.25, metalness: 0.3 }), -0.3, 3.9, -0.3, 'espejo_comoda'));
-  // conejito de adorno
-  comoda.add(new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 10), mBlanco));
-  comoda.children[comoda.children.length - 1].position.set(1.9, 2.8, 0.1);
-  comoda.add(cil(0.08, 0.6, mBlanco, 1.8, 3.4, 0.1, 6));
-  comoda.add(cil(0.08, 0.6, mBlanco, 2.0, 3.4, 0.1, 6));
-  comoda.position.set(-8.2, yA, -9.9);
-  gMuebles.add(comoda);
-
-  // cuadros
-  function cuadro(texCuadro, x, y) {
-    const g = new THREE.Group();
-    g.add(caja(2.2, 2.8, 0.16, M(0xf3efe6), 0, 0, 0, 'marco'));
-    g.add(new THREE.Mesh(new THREE.PlaneGeometry(1.8, 2.4), new THREE.MeshStandardMaterial({ map: texCuadro, roughness: 0.95 })));
-    g.children[1].position.z = 0.1;
-    g.position.set(x, y, HZB + 0.2);
-    return g;
-  }
-  gMuebles.add(cuadro(cuadroLoto, -4.2, yA + 6.4));
-  gMuebles.add(cuadro(cuadroGirasol, -1.6, yA + 6.4));
-
-  // ropero café con puertas entableradas
-  const buro = new THREE.Group();
-  buro.add(caja(2.7, 3.8, 2.2, M(0x5a3520), 0, 1.9, 0, 'ropero'));
-  [-0.66, 0.66].forEach(function (x) {
-    for (let f = 0; f < 3; f++) buro.add(caja(1.0, 0.95, 0.1, M(0x402413), x, 0.75 + f * 1.1, 1.12, 'tablero'));
-    buro.add(cil(0.07, 0.1, mMaderaCl, x * 0.15, 2.0, 1.2, 8));
-  });
-  buro.add(caja(2.7, 0.2, 2.4, M(0x4a2a18), 0, 3.9, 0, 'cornisa'));
-  buro.position.set(4.7, yA, -8.6);
-  gMuebles.add(buro);
-
-  // mesa alta blanca con travesaños
-  const banco = new THREE.Group();
-  banco.add(caja(3.4, 0.25, 2.2, mBlanco, 0, 3.75, 0, 'mesa_blanca'));
-  [[-1.5, -0.9], [1.5, -0.9], [-1.5, 0.9], [1.5, 0.9]].forEach(function (p, i) {
-    banco.add(caja(0.24, 3.7, 0.24, mBlanco, p[0], 1.85, p[1], 'pata' + i));
-  });
-  banco.add(caja(3.0, 0.2, 0.2, mBlanco, 0, 1.2, -0.9, 'travesano_1'));
-  banco.add(caja(3.0, 0.2, 0.2, mBlanco, 0, 1.2, 0.9, 'travesano_2'));
-  banco.add(caja(3.0, 0.14, 1.8, mBlanco, 0, 1.3, 0, 'entrepano'));
-  banco.position.set(9.0, yA, -8.0);
-  gMuebles.add(banco);
-
-  // ============================================================
-  //  Terraza
-  // ============================================================
-  function silla(x, z, rot) {
-    const g = new THREE.Group();
-    g.add(caja(2.6, 0.3, 2.6, mMadera, 0, 2.6, 0, 'asiento'));
-    g.add(caja(2.2, 1.6, 0.2, mMadera, 0, 4.4, -1.15, 'respaldo'));
-    [-1.05, 1.05].forEach(function (px, i) {
-      g.add(caja(0.28, 3.0, 0.28, mMaderaCl, px, 4.2, -1.15, 'poste_respaldo' + i));
-    });
-    g.add(caja(2.4, 0.22, 0.26, mMaderaCl, 0, 3.4, -1.15, 'travesano_respaldo'));
-    [[-1.05, -1.05], [1.05, -1.05], [-1.05, 1.05], [1.05, 1.05]].forEach(function (p, i) {
-      g.add(caja(0.3, 2.6, 0.3, mMaderaCl, p[0], 1.3, p[1], 'pata' + i));
-    });
-    g.position.set(x, 0, z);
-    g.rotation.y = rot;
-    return g;
-  }
-  // mesa de comedor con cubierta de esquinas redondeadas
-  const mesa = new THREE.Group();
-  const cubForma = new THREE.Shape();
-  (function (w, d, r) {
-    cubForma.moveTo(-w + r, -d);
-    cubForma.lineTo(w - r, -d);
-    cubForma.quadraticCurveTo(w, -d, w, -d + r);
-    cubForma.lineTo(w, d - r);
-    cubForma.quadraticCurveTo(w, d, w - r, d);
-    cubForma.lineTo(-w + r, d);
-    cubForma.quadraticCurveTo(-w, d, -w, d - r);
-    cubForma.lineTo(-w, -d + r);
-    cubForma.quadraticCurveTo(-w, -d, -w + r, -d);
-  })(3.5, 2.3, 1.1);
-  const cubierta = new THREE.Mesh(new THREE.ExtrudeGeometry(cubForma, { depth: 0.4, bevelEnabled: false, curveSegments: 8 }), M(lin(0x70472c), { roughness: 0.7 }));
-  cubierta.rotation.x = Math.PI / 2;
-  cubierta.position.y = 4.0;
-  cubierta.castShadow = true; cubierta.receiveShadow = true;
-  cubierta.name = 'cubierta_mesa';
-  mesa.add(cubierta);
-  [[-2.7, -1.5], [2.7, -1.5], [-2.7, 1.5], [2.7, 1.5]].forEach(function (p, i) {
-    mesa.add(caja(0.4, 3.6, 0.4, mMaderaCl, p[0], 1.8, p[1], 'pata' + i));
-  });
-  mesa.position.set(-7.6, 0, 4.4);
-  gTerraza.add(mesa);
-  gTerraza.add(silla(-3.4, 3.4, -Math.PI / 2));
-  gTerraza.add(silla(-3.1, 6.4, -Math.PI / 2.3));
-
-  // sillón tipo tina de fieltro amarillo
-  const mFelpa = M(lin(0xe9cc45), { roughness: 1 });
-  const sillon = new THREE.Group();
-  const asientoS = new THREE.Mesh(new THREE.CylinderGeometry(2.05, 1.9, 2.2, 32), mFelpa);
-  asientoS.position.y = 1.1;
-  const cojin = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.9, 0.5, 32), mFelpa);
-  cojin.position.set(0, 2.4, 0.15);
-  const aro = new THREE.Shape();
-  const a0 = -0.45, a1 = Math.PI + 0.45;
-  aro.absarc(0, 0, 2.1, a0, a1, false);
-  aro.absarc(0, 0, 1.45, a1, a0, true);
-  aro.closePath();
-  const respaldoS = new THREE.Mesh(new THREE.ExtrudeGeometry(aro, {
-    depth: 2.5, bevelEnabled: true, bevelThickness: 0.25, bevelSize: 0.18, bevelSegments: 3, curveSegments: 28
-  }), mFelpa);
-  respaldoS.rotation.x = -Math.PI / 2;     // la forma queda horizontal; el respaldo mira a -z local
-  respaldoS.position.y = 1.9;
-  [asientoS, cojin, respaldoS].forEach(function (m) { m.castShadow = true; m.receiveShadow = true; m.name = 'sillon'; sillon.add(m); });
-  sillon.scale.set(1.1, 1, 1);
-  sillon.position.set(7.6, 0, 8.7);
-  sillon.rotation.y = -0.35;
-  gTerraza.add(sillon);
-
-  // mueble guinda: repisas abiertas, nicho central y cajones
-  const modulo = new THREE.Group();
-  const mGuindaOsc = M(lin(0x5e1d12));
-  modulo.add(caja(8.4, 4.4, 2.4, mRojo, 0, 2.2, 0, 'modulo_rojo'));
-  [-3.3, -1.65, 0, 1.65, 3.3].forEach(function (x, i) {
-    modulo.add(caja(1.4, 0.26 + (i % 2) * 0.14, 1.9, mRojo, x, 4.53 + (i % 2) * 0.07, 0, 'remate' + i));
-  });
-  modulo.add(caja(2.3, 3.6, 0.1, mVino, -2.85, 2.2, 1.21, 'fondo_repisas'));
-  for (let i = 0; i < 4; i++) modulo.add(caja(2.3, 0.16, 0.34, mRojo, -2.85, 0.5 + i * 1.15, 1.3, 'repisa' + i));
-  modulo.add(caja(2.3, 1.7, 0.1, mVino, 0, 3.1, 1.21, 'nicho'));
-  modulo.add(caja(2.3, 1.9, 0.12, mGuindaOsc, 0, 1.1, 1.24, 'puerta_central'));
-  for (let i = 0; i < 4; i++) {
-    modulo.add(caja(2.2, 0.85, 0.12, mGuindaOsc, 2.85, 0.55 + i * 0.98, 1.24, 'cajon' + i));
-    modulo.add(caja(0.5, 0.1, 0.1, mRojo, 2.85, 0.6 + i * 0.98, 1.34, 'tirador' + i));
-  }
-  modulo.position.set(6.2, 0, 4.8);
-  gTerraza.add(modulo);
-
-  // planta de frondas amarillas en la esquina del porche
-  const planta = new THREE.Group();
-  const mHoja = M(0xe2cc2c, { roughness: 0.75 });
-  const mTallo = M(0x7a8a3a);
-  const geoHoja = new THREE.SphereGeometry(0.3, 8, 6);
-  planta.add(cil(0.12, 8.6, mTallo, 0, 4.3, 0, 8));
-  for (let f = 0; f < 9; f++) {
-    const rama = new THREE.Group();
-    const largo = 2.2 + (f % 3) * 0.6;
-    const tallo = cil(0.06, largo, mTallo, 0, largo / 2, 0, 6);
-    rama.add(tallo);
-    for (let k = 0; k < 6; k++) {
-      [-1, 1].forEach(function (s) {
-        const hoja = new THREE.Mesh(geoHoja, mHoja);
-        hoja.scale.set(1.5 - k * 0.13, 0.35, 0.7);
-        hoja.position.set(s * (0.42 - k * 0.03), largo * (0.25 + k * 0.13), 0);
-        hoja.rotation.z = s * 0.55;
-        hoja.castShadow = true;
-        rama.add(hoja);
+    if (arco) {
+      // abanico del medio punto
+      const ri = r - b, rc = ri * 0.35;
+      g.add(caja(x1 - x0 - 2 * b, e, prof, mMDF, xc, ys, zc, 'arranque_arco'));
+      const cubo = new THREE.Shape();
+      cubo.absarc(xc, ys, rc, 0, Math.PI, false);
+      const mc = pieza(cubo, prof, MDF, 'abanico');
+      mc.position.z = T * 0.1;
+      g.add(mc);
+      [Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4].forEach(function (a) {
+        const largo = ri - rc;
+        const rayo = caja(e, largo, prof, mMDF, xc + Math.cos(a) * (rc + largo / 2), ys + Math.sin(a) * (rc + largo / 2), zc, 'rayo');
+        rayo.rotation.z = a - Math.PI / 2;
+        g.add(rayo);
       });
     }
-    const punta = new THREE.Mesh(geoHoja, mHoja);
-    punta.scale.set(0.6, 1.3, 0.5);
-    punta.position.y = largo + 0.2;
-    rama.add(punta);
-    rama.position.y = 1.2 + f * 0.85;
-    rama.rotation.set(0, f * 2.4, 0.55 + (f % 2) * 0.25);
-    planta.add(rama);
+    return g;
   }
-  planta.position.set(-11.2, 0, 9.2);
-  gTerraza.add(planta);
+
+  // persianas de lamas y repisón a los lados de cada ventana
+  function persianasFrente(x0, y0, x1, y1) {
+    const h = y1 - y0 + 0.6, yc = (y0 + y1) / 2;
+    [x0 - 0.95, x1 + 0.95].forEach(function (x) { gBajo.add(caja(1.7, h, 0.18, mPersianaF, x, yc, ZF + 0.09, 'persiana')); });
+    gBajo.add(caja(x1 - x0 + 0.9, 0.3, 0.55, mMDF, (x0 + x1) / 2, y0 - 0.15, ZF + 0.27, 'repison'));
+  }
+  function persianasLado(signo, y0, y1) {
+    const h = y1 - y0, yc = (y0 + y1) / 2, xs = signo * (HX + T + 0.09);
+    [VL.z0 - 0.95, VL.z1 + 0.95].forEach(function (z) { gBajo.add(caja(0.18, h, 1.7, mPersianaL, xs, yc, z, 'persiana')); });
+    gBajo.add(caja(0.55, 0.3, VL.z1 - VL.z0 + 0.9, mMDF, signo * (HX + T + 0.27), y0 - 0.15, (VL.z0 + VL.z1) / 2, 'repison'));
+  }
+
+  VENT_F.forEach(function (v) {
+    const c = cancel(v[0], v[1], v[2], v[3], { cols: 2, filas: 3 });
+    c.position.z = HZF;
+    gBajo.add(c);
+    persianasFrente(v[0], v[1], v[2], v[3]);
+  });
+  const cancelH = cancel(VENT_H[0], VENT_H[1], VENT_H[2], VENT_H[3], { arco: true, cols: 2, filas: 2 });
+  cancelH.position.z = HZF;
+  gBajo.add(cancelH);
+  persianasFrente(VENT_H[0], VENT_H[1], VENT_H[2], VENT_H[3]);
+
+  // las dos ventanas del costado derecho llevan ventilador: quedan sin barrotes
+  [[-1, -HX], [1, HX + T]].forEach(function (lado) {
+    ['bajo', 'alto'].forEach(function (nivel) {
+      const y = VL[nivel];
+      gBajo.add(aLado(cancel(VL.z0, y[0], VL.z1, y[1], { arco: true, cols: 2, filas: 2, sinBarras: lado[0] > 0 }), lado[1]));
+      persianasLado(lado[0], y[0], y[1]);
+    });
+  });
+
+  // ---- puerta doble con 12 vidrios arriba y tableros abajo
+  (function () {
+    const g = new THREE.Group();
+    g.name = 'puerta';
+    const x0 = PUERTA.x0, x1 = PUERTA.x1, alto = PUERTA.alto, b = 0.35;
+    g.add(pieza(forma([[x0, 0], [x0 + b, 0], [x0 + b, alto - b], [x1 - b, alto - b], [x1 - b, 0], [x1, 0], [x1, alto], [x0, alto]]), T, MDF, 'marco_puerta'));
+    const ancho = (x1 - x0 - 2 * b) / 2, yv = 5.4, ytop = alto - b, m = 0.32;
+    [0, 1].forEach(function (k) {
+      const a0 = x0 + b + k * ancho, a1 = a0 + ancho, xm = (a0 + a1) / 2, hv = ytop - m - yv;
+      const hoja = pieza(forma([[a0, 0], [a1, 0], [a1, ytop], [a0, ytop]], [rectH(a0 + m, yv, a1 - m, ytop - m)]), 0.2, MDF, 'hoja_puerta');
+      hoja.position.z = 0.05;
+      g.add(hoja);
+      g.add(caja(0.14, hv, 0.18, mMDF, xm, yv + hv / 2, 0.15, 'parteluz_puerta'));
+      [1, 2].forEach(function (j) { g.add(caja(a1 - a0 - 2 * m, 0.14, 0.18, mMDF, xm, yv + hv * j / 3, 0.15, 'travesano_puerta')); });
+      g.add(caja(a1 - a0 - 1.2, yv - 1.4, 0.08, mMDF, xm, yv / 2, 0.29, 'tablero_puerta'));
+    });
+    g.position.z = HZF;
+    gBajo.add(g);
+  })();
+
+  // ---- encajes de los hastiales: banda calada que sigue el techo y remata en gotas
+  function encaje(ya, tanE, banda, yFin, huecosX, rGota) {
+    const bv = banda / Math.cos(Math.atan(tanE));
+    const xo = (ya - yFin) / tanE, xi = (ya - bv - yFin) / tanE;
+    const huecos = [];
+    huecosX.forEach(function (x) {
+      [-1, 1].forEach(function (s) { huecos.push(circH(s * x, ya - bv / 2 - x * tanE, banda * 0.3)); });
+    });
+    const g = new THREE.Group();
+    g.add(pieza(forma([[0, ya], [xo, yFin], [xi, yFin], [0, ya - bv], [-xi, yFin], [-xo, yFin]], huecos), T, MDF, 'encaje'));
+    [-1, 1].forEach(function (s) {
+      const gota = new THREE.Shape();
+      gota.absarc(0, 0, rGota, 0, Math.PI * 2, false);
+      gota.holes.push(circH(0, 0, rGota * 0.45));
+      const m = pieza(gota, T, MDF, 'gota');
+      m.position.set(s * (xo + xi) / 2, yFin - rGota * 0.6, 0);
+      g.add(m);
+    });
+    return g;
+  }
+  const encajeFrente = encaje(YAC - 0.05, Math.tan(ANGC), 1.8, 16.8, [1.8, 4.0, 6.2, 8.4], 1.0);
+  encajeFrente.position.z = ZF + 0.15;      // separado del muro para que proyecte sombra
+  gBajo.add(encajeFrente);
+  const yEncL = yTecho(ZC) - 0.05;
+  gBajo.add(aLado(encaje(yEncL, Math.tan(ANG), 1.5, yEncL - 4.8 * Math.tan(ANG), [1.4, 2.6], 0.7), -HX - T - 0.15));
+  gBajo.add(aLado(encaje(yEncL, Math.tan(ANG), 1.5, yEncL - 4.8 * Math.tan(ANG), [1.4, 2.6], 0.7), HX + 2 * T + 0.15));
+
+  // ============================================================
+  //  Techo: dos aguas con hastial frontal, crestería y remates
+  // ============================================================
+  const sA = Math.sin(ANG), cA = Math.cos(ANG), tA = Math.tan(ANG);
+  const sC = Math.sin(ANGC), cC = Math.cos(ANGC), tC = Math.tan(ANGC);
+  const cumbrera = new THREE.Vector3(0, YR, ZC);
+
+  // faldón trasero con el hueco grande para ver la buhardilla
+  const HUECO = { x: 18.0, s0: 8.6, s1: 23.6 };
+  gTecho.add(faldonPieza(forma([[-XR, 0], [XR, 0], [XR, SL], [-XR, SL]], [rectH(-HUECO.x, HUECO.s0, HUECO.x, HUECO.s1)]),
+    new THREE.Vector3(0, -sA, -cA), new THREE.Vector3(0, cA, -sA), cumbrera.clone(), 'faldon_trasero'));
+
+  // faldón delantero en dos piezas: la muesca central es donde entra el hastial
+  const dD = new THREE.Vector3(0, -sA, cA), nD = new THREE.Vector3(0, cA, sA);
+  const xMuesca = SL * sA / tC;
+  gTecho.add(faldonPieza(forma([[-XR, 0], [0, 0], [-xMuesca, SL], [-XR, SL]]), dD, nD, cumbrera.clone(), 'faldon_delantero_izq'));
+  gTecho.add(faldonPieza(forma([[0, 0], [XR, 0], [XR, SL], [xMuesca, SL]]), dD, nD, cumbrera.clone(), 'faldon_delantero_der'));
+
+  // faldones del hastial frontal: llegan hasta la limahoya con el faldón principal
+  const SLC = (CGX + 0.6) / cC;
+  const sMuro = (ZF - ZC) * tA / sC;          // donde la limahoya alcanza el plano del frente
+  const puntosC = [[0, 0], [ZFC - ZC, 0], [ZFC - ZF, sMuro], [ZFC - ZF, SLC], [0, SLC]];
+  [-1, 1].forEach(function (s) {
+    gTecho.add(faldonPieza(forma(puntosC.map(function (p) { return [s * p[0], p[1]]; })),
+      new THREE.Vector3(s * cC, -sC, 0), new THREE.Vector3(s * sC, cC, 0), new THREE.Vector3(0, YR, ZFC), 'faldon_hastial'));
+  });
+
+  gTecho.add(caja(2 * XR, 0.45, 0.8, mMDF, 0, YR + 0.08, ZC, 'caballete'));
+  gTecho.add(caja(0.8, 0.45, ZFC - ZC, mMDF, 0, YR + 0.08, (ZFC + ZC) / 2, 'caballete_hastial'));
+
+  // crestería calada sobre la cumbrera
+  const cresta = new THREE.Shape();
+  cresta.moveTo(-0.38, 0); cresta.lineTo(0.38, 0); cresta.lineTo(0.38, 0.2);
+  cresta.quadraticCurveTo(0.1, 0.35, 0.12, 0.62);
+  cresta.quadraticCurveTo(0.42, 0.8, 0.36, 1.05);
+  cresta.quadraticCurveTo(0.3, 1.38, 0, 1.4);
+  cresta.quadraticCurveTo(-0.3, 1.38, -0.36, 1.05);
+  cresta.quadraticCurveTo(-0.42, 0.8, -0.12, 0.62);
+  cresta.quadraticCurveTo(-0.1, 0.35, -0.38, 0.2);
+  const geoCresta = new THREE.ExtrudeGeometry(cresta, { depth: T, bevelEnabled: false, curveSegments: 6 });
+  for (let x = -XR + 0.9; x <= XR - 0.85; x += 1.3) {
+    const m = new THREE.Mesh(geoCresta, MDF);
+    m.position.set(x, YR + 0.3, ZC - T / 2);
+    m.castShadow = true;
+    m.name = 'cresteria';
+    gTecho.add(m);
+  }
+  // remates en punta de cada hastial
+  [[0, ZFC - 0.3], [-(XR - 0.3), ZC], [XR - 0.3, ZC]].forEach(function (p) {
+    gTecho.add(caja(0.32, 2.8, 0.32, mMDF, p[0], YR + 1.3, p[1], 'remate'));
+  });
+
+  // ============================================================
+  //  Porche: postes, barandales, techo de un agua y tejadillo de entrada
+  // ============================================================
+  const tanP = (PR0 - PR1) / PL, ANGP = Math.atan(tanP);
+  const XP = HX + T + 2.0;
+  gPorche.add(faldonPieza(forma([[-XP, 0], [XP, 0], [XP, PL / Math.cos(ANGP)], [-XP, PL / Math.cos(ANGP)]]),
+    new THREE.Vector3(0, -Math.sin(ANGP), Math.cos(ANGP)), new THREE.Vector3(0, Math.cos(ANGP), Math.sin(ANGP)),
+    new THREE.Vector3(0, PR0 + ESP / Math.cos(ANGP), ZF), 'techo_porche'));
+
+  const yViga = PR0 - (PZ - ZF) * tanP;       // cara inferior del techo sobre los postes
+  const VIGA = 0.9;
+  const POSTES = [-(HX + T - 0.65), -6.6, 6.6, HX + T - 0.65];
+  POSTES.forEach(function (x, i) {
+    gPorche.add(caja(1.3, yViga - VIGA, 0.6, mMDF, x, (yViga - VIGA) / 2, PZ, 'poste_porche' + i));
+  });
+  gPorche.add(caja(2 * (HX + T), VIGA, 0.5, mMDF, 0, yViga - VIGA / 2, PZ, 'viga_porche'));
+  [-1, 1].forEach(function (s) {
+    const v = caja(0.5, VIGA, (PZ - ZF) / Math.cos(ANGP), mMDF, s * (HX + T - 0.65), (PR0 + yViga) / 2 - VIGA / 2, (ZF + PZ) / 2, 'viga_lateral');
+    v.rotation.x = ANGP;
+    gPorche.add(v);
+  });
+
+  // ménsulas curvas en la parte alta de los postes
+  const curva = new THREE.Shape();
+  curva.moveTo(0, 0); curva.lineTo(0, -2.2);
+  curva.absarc(2.2, -2.2, 2.2, Math.PI, Math.PI / 2, true);
+  const geoMensula = new THREE.ExtrudeGeometry(curva, { depth: 0.3, bevelEnabled: false, curveSegments: 12 });
+  function mensula(x, z, espejo, rotY) {
+    const m = new THREE.Mesh(geoMensula, MDF);
+    m.position.set(x, yViga - VIGA, z);
+    m.scale.x = espejo ? -1 : 1;
+    m.rotation.y = rotY || 0;
+    m.castShadow = true;
+    m.name = 'mensula';
+    gPorche.add(m);
+  }
+  POSTES.forEach(function (x, i) {
+    if (i > 0) mensula(x - 0.65, PZ - 0.15, true);
+    if (i < 3) mensula(x + 0.65, PZ - 0.15, false);
+    if (i === 0 || i === 3) mensula(x - 0.15, PZ - 0.3, false, Math.PI / 2);
+  });
+
+  // barandales calados entre postes
+  function barandal(x0, x1) {
+    const n = Math.floor((x1 - x0 - 0.5) / 0.85);
+    const x00 = (x0 + x1) / 2 - (n - 1) * 0.85 / 2;
+    const huecos = [];
+    for (let i = 0; i < n; i++) huecos.push(arcoH(x00 + i * 0.85 - 0.22, 1.0, x00 + i * 0.85 + 0.22, 4.1));
+    const m = pieza(forma([[x0, 0.3], [x1, 0.3], [x1, 4.9], [x0, 4.9]], huecos), 0.3, MDF, 'barandal');
+    m.position.z = PZ - 0.15;
+    gPorche.add(m);
+  }
+  barandal(POSTES[0] + 0.65, POSTES[1] - 0.65);
+  barandal(POSTES[2] + 0.65, POSTES[3] - 0.65);
+
+  // tejadillo a dos aguas sobre la entrada, con frontón perforado
+  const YM = 17.6, XM = 7.9;
+  const ANGM = Math.atan2(YM - 13.6, XM), SLM = (XM + 0.2) / Math.cos(ANGM);
+  const zM = ZF + PL;
+  [-1, 1].forEach(function (s) {
+    gPorche.add(faldonPieza(forma([[0, 0], [s * (zM - ZF), 0], [s * (zM - ZF), SLM], [0, SLM]]),
+      new THREE.Vector3(s * Math.cos(ANGM), -Math.sin(ANGM), 0), new THREE.Vector3(s * Math.sin(ANGM), Math.cos(ANGM), 0),
+      new THREE.Vector3(0, YM, zM), 'tejadillo_entrada'));
+  });
+  gPorche.add(caja(0.6, 0.4, zM - ZF, mMDF, 0, YM + 0.05, (zM + ZF) / 2, 'caballete_entrada'));
+  const yMu = function (x) { return YM - ESP / Math.cos(ANGM) - Math.abs(x) * Math.tan(ANGM); };
+  const fronton = pieza(forma([[-7.3, 12.2], [7.3, 12.2], [7.3, yMu(7.3)], [0, yMu(0)], [-7.3, yMu(7.3)]], [circH(0, 14.8, 0.45)]), 0.3, MDF, 'fronton');
+  fronton.position.z = PZ + 0.35;
+  gPorche.add(fronton);
 
   // ============================================================
   //  Capa de sensores (AirCare)
@@ -955,7 +712,7 @@ function main(){
     const t = new THREE.CanvasTexture(c);
     t.encoding = THREE.sRGBEncoding;
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false }));
-    s.scale.set(5.0, 0.84, 1);
+    s.scale.set(5.6, 0.94, 1);
     s.userData.noExport = true;
     return s;
   }
@@ -1322,13 +1079,22 @@ function main(){
   }
 
   // ---- soporte con etiqueta
+  // op.pared = distancia al muro: ménsula en L atornillada al muro, que queda
+  // hacia -z local (con rotY se orienta a cualquier muro). Sin op.pared se usa
+  // un poste de largo op.poste (0 = sin soporte).
   function montaje(modelo, texto, x, y, z, op) {
     op = op || {};
-    const largo = op.poste === undefined ? 1.7 : op.poste;
     const g = new THREE.Group();
-    if (largo > 0.05) {
-      g.add(caja(0.22, largo, 0.22, mSoporte, 0, -(0.26 + largo / 2), 0, 'poste_modulo'));
-      g.add(caja(1.5, 0.18, 1.1, mSoporte, 0, -0.17, 0, 'placa_soporte'));
+    if (op.pared !== undefined) {
+      const d = op.pared;
+      g.add(caja(1.6, 0.18, d + 0.6, mSoporte, 0, -0.17, (0.6 - d) / 2, 'repisa_modulo'));
+      g.add(caja(1.6, 1.5, 0.2, mSoporte, 0, -0.95, -d + 0.1, 'mensula_modulo'));
+    } else {
+      const largo = op.poste === undefined ? 1.7 : op.poste;
+      if (largo > 0.05) {
+        g.add(caja(0.22, largo, 0.22, mSoporte, 0, -(0.26 + largo / 2), 0, 'poste_modulo'));
+        g.add(caja(1.5, 0.18, 1.1, mSoporte, 0, -0.17, 0, 'placa_soporte'));
+      }
     }
     g.add(modelo);
     const et = etiqueta(texto);
@@ -1350,7 +1116,7 @@ function main(){
   }
   function manojo(puntos, colores) {
     const base = new THREE.CatmullRomCurve3(puntos.map(function (p) { return new THREE.Vector3(p[0], p[1], p[2]); }));
-    const N = 80;
+    const N = 120;
     const marcos = base.computeFrenetFrames(N, false);
     const g = new THREE.Group();
     g.name = 'manojo';
@@ -1370,62 +1136,46 @@ function main(){
     });
     return g;
   }
-  // pasamuros: anillo por donde el manojo cruza el muro trasero
-  function pasamuros(x, y) {
-    const g = new THREE.Group();
-    const a = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.12, 8, 18), mNegroMate);
-    a.rotation.y = Math.PI / 2;
-    a.rotation.x = Math.PI / 2;
-    a.position.set(x, y, HZB - T / 2);
-    a.name = 'pasamuros';
-    g.add(a);
-    return g;
-  }
-  // variante para el muro lateral izquierdo (cocina): el ducto cruza en x, no en z
-  function pasamurosLateral(z, y) {
-    const g = new THREE.Group();
-    const a = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.12, 8, 18), mNegroMate);
-    a.rotation.y = Math.PI / 2;
-    a.position.set(-HX - T / 2, y, z);
-    a.name = 'pasamuros';
-    g.add(a);
-    return g;
-  }
-  // ruta estándar: del módulo al muro trasero, lo cruza, baja por fuera y entra a la bahía
-  function ruta(x, y, z, xPaso, destino, intermedio) {
-    const p = [[x, y - 0.4, z], [x, y - 1.5, z]];
-    if (intermedio) p.push(intermedio);
-    p.push([xPaso, y - 1.9, HZB + 0.9]);
-    p.push([xPaso, y - 2.1, HZB - T - 0.8]);
-    p.push([xPaso, 2.9, BZ0 - 0.9]);
-    p.push([destino[0], destino[1] + 1.1, destino[2] + 1.2]);
-    p.push(destino);
-    return p;
+  // canaleta de PVC entre dos esquinas opuestas (alineada a los ejes)
+  function canaleta(x0, y0, z0, x1, y1, z1) {
+    return caja(Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0), mCanaleta,
+      (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, 'canaleta');
   }
 
   // ============================================================
   //  Instalación sobre la maqueta
   // ============================================================
-  const ZM = HZB + 1.8;            // plano de montaje contra el muro trasero
-  const PB = 6.0, PA = yA + 5.0;   // alturas de trabajo en cada nivel
+  // Como la casa está abierta por detrás, la electrónica va en la franja
+  // trasera de la planta baja, a mano para el USB. Los cables bajan por los
+  // muros y corren por canaletas: una a ras de piso en cada costado y una
+  // vertical en cada esquina trasera que sube a la buhardilla.
+  const LX = -HX + 0.4, RX = HX - 0.4;      // carril de cables pegado a cada muro lateral
 
-  // --- bahía técnica: protoboard con el ESP32 y módulo de relevadores
+  // --- franja técnica: protoboard con el ESP32 y módulo de relevadores
   const proto = modProtoboard();
-  proto.position.set(-4.0, 0.45, -15.4);
+  proto.position.set(-8.0, 0.45, -9.7);
   gSensores.add(proto);
   const esp = modESP32();
-  esp.position.set(1.0, 1.30, -15.4);
+  esp.position.set(-3.0, 1.30, -9.7);
   gSensores.add(esp);
   const etqEsp = etiqueta('ESP32 · protoboard 830');
-  etqEsp.position.set(1.0, 3.6, -15.4);
+  etqEsp.position.set(-3.0, 3.6, -9.7);
   gSensores.add(etqEsp);
 
+  // relevadores girados: las clemas miran hacia el muro derecho, de donde llegan los actuadores
   const reles = modRelevadores();
-  reles.position.set(9.0, 0.08, -15.4);
+  reles.position.set(9.3, 0.08, -9.3);
+  reles.rotation.y = Math.PI / 2;
   gSensores.add(reles);
   const etqRele = etiqueta('Relevadores 25 / 26 / 27');
-  etqRele.position.set(9.0, 3.6, -15.4);
+  etqRele.position.set(9.3, 3.6, -9.3);
   gSensores.add(etqRele);
+
+  // canaletas
+  gSensores.add(canaleta(-HX, 0, -6.0, -HX + 0.9, 0.8, HZF));          // piso, costado izquierdo
+  gSensores.add(canaleta(HX - 0.9, 0, -5.6, HX, 0.8, 3.2));            // piso, costado derecho
+  gSensores.add(canaleta(-HX, 0, HZB, -HX + 0.9, yA + 0.9, HZB + 0.9)); // esquina trasera izquierda
+  gSensores.add(canaleta(HX - 0.9, 0, HZB, HX, yA + 0.9, HZB + 0.9));  // esquina trasera derecha
 
   // módulos que la simulación puede seleccionar con clic (id -> montaje)
   const montados = {};
@@ -1436,85 +1186,86 @@ function main(){
     return g;
   }
 
-  // --- sensores de planta baja
-  // Cocina: el extractor va sobre la estufa; el resto se separó de ese
-  // rincón para que las etiquetas no se encimen. El DHT22 de planta baja
-  // se movió al muro lateral de la cocina, perpendicular al resto.
-  registrar('polvo', montaje(modPolvo(), 'GP2Y1010 · 32 / 33', 1.4, PB, ZM));
-  registrar('mq135', montaje(modMQ(texSilkMQ135), 'MQ135 · GPIO34', 5.6, PB, ZM));
-  registrar('mq2', montaje(modMQ(texSilkMQ2), 'MQ2 · GPIO35', 9.0, 9.4, ZM, { etq: 2.0 }));
-  registrar('dhtPB', montaje(modDHT22(), 'DHT22 PB · GPIO4', -HX - T / 2, 8.0, -7.0, { rotY: Math.PI / 2, etq: 3.2 }));
+  // --- planta baja: gases y DHT22 en ménsulas sobre el muro izquierdo
+  // (MQ2 en alto porque el humo sube), polvo sobre la ventana izquierda del frente
+  const IZQ = Math.PI / 2, DER = -Math.PI / 2, FRENTE = Math.PI;
+  registrar('mq135', montaje(modMQ(texSilkMQ135), 'MQ135 · GPIO34', -HX + 1.6, 7.0, -6.5, { rotY: IZQ, pared: 1.6 }));
+  registrar('mq2', montaje(modMQ(texSilkMQ2), 'MQ2 · GPIO35', -HX + 1.6, 15.0, 6.5, { rotY: IZQ, pared: 1.6, etq: 2.0 }));
+  registrar('dhtPB', montaje(modDHT22(), 'DHT22 PB · GPIO4', -HX + 1.6, 8.5, 10.6, { rotY: IZQ, pared: 1.6, etq: 3.6 }));
+  registrar('polvo', montaje(modPolvo(), 'GP2Y1010 · 32 / 33', -11.4, 12.0, HZF - 1.8, { rotY: FRENTE, pared: 1.8, etq: 2.9 }));
 
-  // --- sensores de planta alta
-  registrar('dhtPA', montaje(modDHT22(), 'DHT22 PA · GPIO16', 6.2, PA, ZM, { etq: 3.6 }));
-  registrar('bh', montaje(modBH1750(), 'BH1750 · I2C 21 / 22', 5.0, 20.3, ZM, { etq: 1.9 }));
+  // --- buhardilla: DHT22 en el hastial izquierdo, BH1750 bajo la ventana del hastial frontal
+  registrar('dhtPA', montaje(modDHT22(), 'DHT22 PA · GPIO16', -HX + 1.6, 24.5, -6.0, { rotY: IZQ, pared: 1.6, etq: 3.6 }));
+  registrar('bh', montaje(modBH1750(), 'BH1750 · I2C 21 / 22', 0, 20.0, HZF - 1.0, { rotY: FRENTE, poste: 20.0 - 0.26 - yA, etq: 1.9 }));
 
-  // --- actuadores
+  // --- actuadores: extractor y ventilación cruzada en las ventanas del costado
+  // derecho (el aire sale o entra por las ventanas libres del izquierdo);
+  // la alerta, en el hastial derecho de la buhardilla
   const ventExtractor = modVentilador();
   const ventCruzada = modVentilador();
   const moduloAlerta = modAlerta();
-  registrar('extractor', montaje(ventExtractor, 'Extractor · GPIO25', -5.2, 5.35, HZB + 1.2, { etq: 3.0 }));
-  registrar('ventilacion', montaje(ventCruzada, 'Ventilación · GPIO26', 9.6, yA + 1.9, -2.0, { rotY: -Math.PI / 2, etq: 4.8 }));
-  registrar('alerta', montaje(moduloAlerta, 'Alerta · GPIO27', 0.6, 13.0, ZM, { etq: 2.0, poste: 0 }));
+  const YV_PB = VL.bajo[0] + 0.4, YV_PA = VL.alto[0] + 0.4;   // base de cada ventilador
+  registrar('extractor', montaje(ventExtractor, 'Extractor · GPIO25', HX + T / 2, YV_PB - 0.05, 0, { rotY: IZQ, poste: 0, etq: 5.2 }));
+  registrar('ventilacion', montaje(ventCruzada, 'Ventilación · GPIO26', HX + T / 2, YV_PA - 0.05, 0, { rotY: DER, poste: 0, etq: 4.8 }));
+  registrar('alerta', montaje(moduloAlerta, 'Alerta · GPIO27', HX - 1.4, 24.5, -6.0, { rotY: DER, pared: 1.4, etq: 3.4 }));
 
-  // --- manojos de cable hasta la protoboard y los relevadores
-  const L = {
-    extractor: [-5.4, 0.95, -13.0],
-    polvo:  [-3.6, 0.95, -13.0],
-    mq135:  [-1.8, 0.95, -13.0],
-    mq2:    [0.0, 0.95, -13.0],
-    dhtPB:  [-6.6, 0.95, -14.6],
-    dhtPA:  [1.8, 0.95, -13.0],
-    bh:     [3.4, 0.95, -13.0],
-    rele1:  [6.2, 1.0, -12.9],
-    rele2:  [8.4, 1.0, -12.9],
-    rele3:  [10.6, 1.0, -12.9]
-  };
+  // placa adaptadora que tapa cada ventana alrededor del ventilador
+  [YV_PB, YV_PA].forEach(function (yv, i) {
+    const y = i ? VL.alto : VL.bajo;
+    const s = arcoP(new THREE.Shape(), VL.z0, y[0], VL.z1, y[1]);
+    s.holes.push(rectH(-2.0, yv, 2.0, yv + 4.0));
+    gSensores.add(aLado(pieza(s, 0.2, [mSoporte, mSoporte], 'adaptador_ventilador'), HX + T / 2 + 0.1));
+  });
+
+  // --- manojos de cable. Terminales: protoboard (sensores) y clemas de los relevadores (actuadores)
+  const RELE = { x: 11.95, ch1: -7.0, ch2: -9.3, ch3: -11.6 };
   const cables = [
-    [ruta(-5.2, 7.2, HZB + 1.2, -3.6, L.extractor), [CAB.rojo, CAB.negro]],
-    [ruta(1.4, PB, ZM, 1.4, L.polvo), [CAB.rojo, CAB.negro, CAB.amarillo, CAB.azul]],
-    [ruta(5.6, PB, ZM, 5.2, L.mq135), [CAB.rojo, CAB.negro, CAB.amarillo]],
-    [ruta(9.0, 9.4, ZM, 8.2, L.mq2), [CAB.rojo, CAB.negro, CAB.verde]],
-    [ruta(6.2, PA, ZM, 8.8, L.dhtPA), [CAB.rojo, CAB.negro, CAB.morado]],
-    [ruta(5.0, 20.3, ZM, 4.6, L.bh), [CAB.rojo, CAB.negro, CAB.amarillo, CAB.verde]],
-    [ruta(9.6, yA + 3.6, -2.6, 10.6, L.rele2, [10.6, yA + 2.4, HZB + 2.2]), [CAB.rojo, CAB.negro]],
-    [ruta(0.6, 12.6, ZM, 0.4, L.rele3), [CAB.rojo, CAB.negro, CAB.naranja]]
+    // planta baja, izquierda: bajan por el muro a la canaleta del piso y salen hacia la protoboard
+    [[[-17.8, 6.55, -6.5], [-18.4, 6.2, -5.2], [LX, 5.6, -4.4], [LX, 1.4, -4.4], [-18.95, 0.4, -4.9],
+      [-18.95, 0.4, -5.7], [-18.6, 0.38, -6.4], [-18.0, 0.35, -9.0], [-17.2, 0.4, -9.7], [-16.4, 0.95, -9.7], [-13.2, 0.95, -9.7]],
+     [CAB.rojo, CAB.negro, CAB.amarillo]],                                     // MQ135
+    [[[-17.8, 14.55, 6.5], [-18.4, 14.2, 5.2], [LX, 13.6, 4.4], [LX, 1.4, 4.4], [-18.95, 0.4, 3.9],
+      [-18.95, 0.4, -5.7], [-18.75, 0.38, -6.4], [-18.2, 0.35, -8.3], [-17.2, 0.4, -9.0], [-16.4, 0.95, -9.0], [-14.0, 0.95, -9.0]],
+     [CAB.rojo, CAB.negro, CAB.verde]],                                        // MQ2
+    [[[-17.8, 8.05, 10.6], [-18.4, 7.8, 9.3], [LX, 7.2, 8.6], [LX, 1.4, 8.6], [-18.95, 0.4, 8.1],
+      [-18.95, 0.4, -5.7], [-18.95, 0.38, -6.4], [-18.4, 0.35, -7.6], [-17.2, 0.4, -8.3], [-16.4, 0.95, -8.3], [-14.8, 0.95, -8.3]],
+     [CAB.rojo, CAB.negro, CAB.azul]],                                         // DHT22 PB
+    [[[-11.4, 11.6, HZF - 1.8], [-12.4, 11.3, 12.2], [-14.8, 11.0, 12.45], [-18.6, 10.8, 12.45], [LX, 9.6, 12.4], [LX, 1.4, 12.3],
+      [-18.95, 0.4, 11.6], [-18.95, 0.4, -5.7], [-19.1, 0.38, -6.4], [-18.6, 0.35, -7.0], [-17.2, 0.4, -7.6], [-16.4, 0.95, -7.6], [-15.6, 0.95, -7.6]],
+     [CAB.rojo, CAB.negro, CAB.amarillo, CAB.azul]],                           // GP2Y1010
+    // buhardilla, izquierda: por el piso de la buhardilla a la canaleta vertical y abajo a la protoboard
+    [[[-17.8, 24.05, -6.0], [-18.4, 23.7, -7.3], [LX, 23.0, -8.0], [LX, 18.75, -8.6], [LX, 18.72, -10.8],
+      [-18.95, 19.6, -12.2], [-18.95, 19.0, -12.7], [-18.95, 1.4, -12.7], [-18.3, 0.6, -12.6], [-17.2, 0.4, -11.8], [-16.4, 0.95, -11.8], [-15.4, 0.95, -11.8]],
+     [CAB.rojo, CAB.negro, CAB.morado]],                                       // DHT22 PA
+    [[[0, 19.55, HZF - 1.0], [-0.6, 18.75, 12.35], [-6.0, 18.68, 12.4], [-17.6, 18.68, 12.4], [-18.35, 18.68, 11.6], [-18.35, 18.68, -10.8],
+      [-18.7, 19.6, -12.2], [-18.7, 19.0, -12.7], [-18.7, 1.0, -12.7], [-18.1, 0.5, -12.3], [-17.2, 0.4, -11.0], [-16.4, 0.95, -11.0], [-14.4, 0.95, -11.0]],
+     [CAB.rojo, CAB.negro, CAB.amarillo, CAB.verde]],                          // BH1750
+    // actuadores, derecha: a las clemas de cada canal
+    [[[18.85, YV_PB + 0.2, 1.4], [RX, YV_PB - 0.6, 2.4], [RX, 1.4, 2.4], [18.95, 0.4, 1.9], [18.95, 0.4, -5.2],
+      [18.6, 0.38, -6.0], [15.0, 0.35, -6.5], [13.0, 0.4, RELE.ch1], [RELE.x, 0.9, RELE.ch1]],
+     [CAB.rojo, CAB.negro]],                                                   // extractor -> canal 1
+    [[[18.85, YV_PA + 0.6, 1.4], [18.4, YV_PA - 0.6, 1.2], [18.4, 18.72, 0.2], [18.4, 18.72, -10.8],
+      [18.7, 19.6, -12.2], [18.7, 19.0, -12.7], [18.7, 1.4, -12.7], [18.0, 0.5, -12.2], [15.2, 0.35, -11.0], [13.2, 0.35, -9.6], [RELE.x, 0.9, RELE.ch2]],
+     [CAB.rojo, CAB.negro]],                                                   // ventilación -> canal 2
+    [[[18.0, 24.05, -6.0], [18.6, 23.7, -7.3], [RX, 23.0, -8.0], [RX, 18.75, -8.6], [RX, 18.72, -10.8],
+      [18.95, 19.6, -12.2], [18.95, 19.0, -12.75], [18.95, 0.9, -12.75], [18.2, 0.4, -12.85], [14.6, 0.35, -12.65], [12.9, 0.4, -11.9], [RELE.x, 0.9, RELE.ch3]],
+     [CAB.rojo, CAB.negro, CAB.naranja]],                                      // alerta -> canal 3
+    // del ESP32 a las entradas del módulo de relevadores
+    [[[-0.6, 1.15, -8.6], [1.4, 0.7, -6.6], [5.0, 0.35, -5.2], [10.6, 0.35, -5.0], [11.75, 0.35, -5.9]],
+     [CAB.naranja, CAB.blanco, CAB.morado, CAB.rojo, CAB.negro]]
   ];
   cables.forEach(function (c) { gSensores.add(manojo(c[0], c[1])); });
-
-  // DHT22 de cocina: cruza el muro lateral izquierdo (no el trasero) y
-  // rodea por fuera hasta la bahía técnica
-  gSensores.add(manojo([
-    [-HX - T / 2 - 0.4, 7.6, -7.0],
-    [-HX - T - 1.1, 7.3, -7.0],
-    [-HX - T - 1.1, 1.6, -8.6],
-    [-HX - T - 1.1, 1.3, HZB - T - 0.8],
-    [-9.0, 1.0, BZ0 - 0.9],
-    [L.dhtPB[0] + 0.3, L.dhtPB[1] + 1.0, L.dhtPB[2] + 1.1],
-    L.dhtPB
-  ], [CAB.rojo, CAB.negro, CAB.azul]));
-
-  // del ESP32 a las entradas del módulo de relevadores
-  gSensores.add(manojo([[1.0, 1.0, -16.6], [3.2, 1.4, -17.1], [5.0, 1.3, -17.4], [6.1, 1.0, -17.75]],
-    [CAB.naranja, CAB.blanco, CAB.morado, CAB.rojo, CAB.negro]));
-
-  // pasamuros visibles en el muro trasero
-  [[-3.6, 5.3], [1.4, PB - 1.9], [5.2, PB - 1.9], [8.2, 7.5],
-   [8.8, PA - 1.9], [4.6, 18.4], [10.6, yA + 1.7], [0.4, 10.7]]
-    .forEach(function (p) { gSensores.add(pasamuros(p[0], p[1])); });
-  // pasamuros en el muro lateral de la cocina, para el DHT22
-  gSensores.add(pasamurosLateral(-7.0, 7.6));
 
 
   // ============================================================
   //  Cámara orbital
   // ============================================================
-  const ctl = { objetivo: new THREE.Vector3(0, 9, -2), radio: 58, theta: 0.78, phi: 1.15 };
+  const ctl = { objetivo: new THREE.Vector3(0, 18, 4), radio: 112, theta: 0.62, phi: 1.12 };
   const LIM_PHI_MIN = 0.12, LIM_PHI_MAX = Math.PI / 2 + 0.30;
 
   function actualizarCamara() {
     ctl.phi = Math.max(LIM_PHI_MIN, Math.min(LIM_PHI_MAX, ctl.phi));
-    ctl.radio = Math.max(16, Math.min(150, ctl.radio));
+    ctl.radio = Math.max(20, Math.min(230, ctl.radio));
     const sp = Math.sin(ctl.phi), cp = Math.cos(ctl.phi);
     camera.position.set(
       ctl.objetivo.x + ctl.radio * sp * Math.sin(ctl.theta),
@@ -1567,16 +1318,17 @@ function main(){
   lienzo.addEventListener('touchend', function () { pinchAnterior = null; });
 
   const VISTAS = {
-    tresc:  { theta: 0.78, phi: 1.15, radio: 58, y: 9 },
-    frente: { theta: 0.0,  phi: 1.40, radio: 52, y: 10 },
-    lado:   { theta: 1.57, phi: 1.45, radio: 52, y: 9 },
-    planta: { theta: 0.0,  phi: 0.16, radio: 54, y: 6 }
+    tresc:  { theta: 0.62, phi: 1.12, radio: 112, y: 18, z: 4 },
+    frente: { theta: 0.0,  phi: 1.42, radio: 100, y: 19, z: 4 },
+    lado:   { theta: 1.57, phi: 1.42, radio: 100, y: 19, z: 4 },
+    atras:  { theta: Math.PI - 0.42, phi: 1.2, radio: 86, y: 13, z: -3 },   // por la parte abierta: ve la instalación
+    planta: { theta: 0.0,  phi: 0.16, radio: 100, y: 10, z: 4 }
   };
   document.querySelectorAll('[data-vista]').forEach(function (b) {
     b.addEventListener('click', function () {
       const v = VISTAS[b.dataset.vista];
       ctl.theta = v.theta; ctl.phi = v.phi; ctl.radio = v.radio;
-      ctl.objetivo.set(0, v.y, -2);
+      ctl.objetivo.set(0, v.y, v.z);
       actualizarCamara();
     });
   });
@@ -1587,8 +1339,7 @@ function main(){
   const capas = {
     'c-techo': gTecho,
     'c-alto': gAlto,
-    'c-muebles': gMuebles,
-    'c-terraza': gTerraza,
+    'c-porche': gPorche,
     'c-sensores': gSensores
   };
   Object.keys(capas).forEach(function (id) {
@@ -1993,7 +1744,7 @@ function main(){
     scene.traverse(function (o) {
       if (!o.isMesh || o.userData.noExport || !visible(o)) return;
       const mat = Array.isArray(o.material) ? o.material[0] : o.material;
-      const hex = mat && mat.color ? mat.color.getHexString() : 'cccccc';
+      const hex = mat && mat.userData.hexExport ? mat.userData.hexExport : (mat && mat.color ? mat.color.getHexString() : 'cccccc');
       const nombreMat = 'mat_' + hex;
       if (!materiales.has(nombreMat)) materiales.set(nombreMat, hex);
       let geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
