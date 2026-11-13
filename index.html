@@ -161,7 +161,7 @@
     <hr>
     <button class="exportar" id="btn-obj">Descargar modelo .obj</button>
     <p class="pie">Se descargan dos archivos (.obj y .mtl). Ábrelos juntos en Blender, SketchUp o Three.js.</p>
-    <p class="medidas">Escala: 1 unidad = 1 cm (medidas estimadas de las fotos). Base 44 × 38 cm, casa 39.4 × 26.3 cm, cumbrera a 42 cm.<br>Casa abierta por detrás: la electrónica (ESP32 en protoboard de 830 puntos y 3 relevadores) va en la franja trasera de la planta baja; usa la vista «Atrás» para ver la instalación.</p>
+    <p class="medidas">Escala: 1 unidad = 1 cm (medidas estimadas de las fotos). Base 44 × 38 cm, casa 39.4 × 26.3 cm, cumbrera a 42 cm.<br>Dentro: un sensor de cada tipo, 2 extractores y 1 alarma. La electrónica (ESP32 en protoboard de 830 puntos y 3 relevadores) va fuera, en un tablero detrás de la base; usa la vista «Atrás» para verla.</p>
   </div>
 </div>
 
@@ -1145,37 +1145,43 @@ function main(){
   // ============================================================
   //  Instalación sobre la maqueta
   // ============================================================
-  // Como la casa está abierta por detrás, la electrónica va en la franja
-  // trasera de la planta baja, a mano para el USB. Los cables bajan por los
-  // muros y corren por canaletas: una a ras de piso en cada costado y una
-  // vertical en cada esquina trasera que sube a la buhardilla.
+  // Dentro de la casa solo hay un sensor de cada tipo, dos extractores y una
+  // alarma. Toda la electrónica (protoboard, ESP32 y relevadores) queda fuera,
+  // en un tablero de control apoyado detrás de la base. Los cables bajan por
+  // los muros a canaletas (una a ras de piso en cada costado y una vertical en
+  // cada esquina trasera que sube a la buhardilla) y salen por la parte
+  // trasera abierta hacia el tablero.
   const LX = -HX + 0.4, RX = HX - 0.4;      // carril de cables pegado a cada muro lateral
 
-  // --- franja técnica: protoboard con el ESP32 y módulo de relevadores
+  // --- tablero de control fuera de la casa
+  const TZ0 = BZ0 - 0.5, TZ1 = TZ0 - 9.5;   // separado 5 mm de la base
+  const TZC = (TZ0 + TZ1) / 2;
+  gSensores.add(caja(BW - 4, BT, TZ0 - TZ1, MDF6, 0, -BT / 2, TZC, 'tablero_control'));
+
   const proto = modProtoboard();
-  proto.position.set(-8.0, 0.45, -9.7);
+  proto.position.set(-8.0, 0.45, TZC);
   gSensores.add(proto);
   const esp = modESP32();
-  esp.position.set(-3.0, 1.30, -9.7);
+  esp.position.set(-3.0, 1.30, TZC);
   gSensores.add(esp);
   const etqEsp = etiqueta('ESP32 · protoboard 830');
-  etqEsp.position.set(-3.0, 3.6, -9.7);
+  etqEsp.position.set(-3.0, 3.6, TZC);
   gSensores.add(etqEsp);
 
-  // relevadores girados: las clemas miran hacia el muro derecho, de donde llegan los actuadores
+  // relevadores girados: las clemas miran hacia la derecha, de donde llegan los actuadores
   const reles = modRelevadores();
-  reles.position.set(9.3, 0.08, -9.3);
+  reles.position.set(9.3, 0.08, TZC);
   reles.rotation.y = Math.PI / 2;
   gSensores.add(reles);
   const etqRele = etiqueta('Relevadores 25 / 26 / 27');
-  etqRele.position.set(9.3, 3.6, -9.3);
+  etqRele.position.set(9.3, 3.6, TZC);
   gSensores.add(etqRele);
 
-  // canaletas
-  gSensores.add(canaleta(-HX, 0, -6.0, -HX + 0.9, 0.8, HZF));          // piso, costado izquierdo
-  gSensores.add(canaleta(HX - 0.9, 0, -5.6, HX, 0.8, 3.2));            // piso, costado derecho
-  gSensores.add(canaleta(-HX, 0, HZB, -HX + 0.9, yA + 0.9, HZB + 0.9)); // esquina trasera izquierda
-  gSensores.add(canaleta(HX - 0.9, 0, HZB, HX, yA + 0.9, HZB + 0.9));  // esquina trasera derecha
+  // canaletas: las de piso terminan contra la vertical de su esquina
+  gSensores.add(canaleta(-HX, 0, HZB + 0.9, -HX + 0.85, 0.75, HZF));       // piso, costado izquierdo
+  gSensores.add(canaleta(HX - 0.85, 0, HZB + 0.9, HX, 0.75, 3.2));         // piso, costado derecho
+  gSensores.add(canaleta(-HX, 0, HZB, -HX + 0.9, yA + 0.9, HZB + 0.9));    // esquina trasera izquierda
+  gSensores.add(canaleta(HX - 0.9, 0, HZB, HX, yA + 0.9, HZB + 0.9));      // esquina trasera derecha
 
   // módulos que la simulación puede seleccionar con clic (id -> montaje)
   const montados = {};
@@ -1191,25 +1197,24 @@ function main(){
   const IZQ = Math.PI / 2, DER = -Math.PI / 2, FRENTE = Math.PI;
   registrar('mq135', montaje(modMQ(texSilkMQ135), 'MQ135 · GPIO34', -HX + 1.6, 7.0, -6.5, { rotY: IZQ, pared: 1.6 }));
   registrar('mq2', montaje(modMQ(texSilkMQ2), 'MQ2 · GPIO35', -HX + 1.6, 15.0, 6.5, { rotY: IZQ, pared: 1.6, etq: 2.0 }));
-  registrar('dhtPB', montaje(modDHT22(), 'DHT22 PB · GPIO4', -HX + 1.6, 8.5, 10.6, { rotY: IZQ, pared: 1.6, etq: 3.6 }));
+  registrar('dht', montaje(modDHT22(), 'DHT22 · GPIO4', -HX + 1.6, 8.5, 10.6, { rotY: IZQ, pared: 1.6, etq: 3.6 }));
   registrar('polvo', montaje(modPolvo(), 'GP2Y1010 · 32 / 33', -11.4, 12.0, HZF - 1.8, { rotY: FRENTE, pared: 1.8, etq: 2.9 }));
 
-  // --- buhardilla: DHT22 en el hastial izquierdo, BH1750 bajo la ventana del hastial frontal
-  registrar('dhtPA', montaje(modDHT22(), 'DHT22 PA · GPIO16', -HX + 1.6, 24.5, -6.0, { rotY: IZQ, pared: 1.6, etq: 3.6 }));
+  // --- buhardilla: BH1750 bajo la ventana del hastial frontal
   registrar('bh', montaje(modBH1750(), 'BH1750 · I2C 21 / 22', 0, 20.0, HZF - 1.0, { rotY: FRENTE, poste: 20.0 - 0.26 - yA, etq: 1.9 }));
 
-  // --- actuadores: extractor y ventilación cruzada en las ventanas del costado
-  // derecho (el aire sale o entra por las ventanas libres del izquierdo);
-  // la alerta, en el hastial derecho de la buhardilla
+  // --- actuadores: un extractor en cada ventana del costado derecho (el aire
+  // de reposición entra por las ventanas del izquierdo) y una sola alarma,
+  // LED + zumbador, en el hastial derecho de la buhardilla
   const ventExtractor = modVentilador();
-  const ventCruzada = modVentilador();
+  const ventExtractor2 = modVentilador();
   const moduloAlerta = modAlerta();
   const YV_PB = VL.bajo[0] + 0.4, YV_PA = VL.alto[0] + 0.4;   // base de cada ventilador
-  registrar('extractor', montaje(ventExtractor, 'Extractor · GPIO25', HX + T / 2, YV_PB - 0.05, 0, { rotY: IZQ, poste: 0, etq: 5.2 }));
-  registrar('ventilacion', montaje(ventCruzada, 'Ventilación · GPIO26', HX + T / 2, YV_PA - 0.05, 0, { rotY: DER, poste: 0, etq: 4.8 }));
-  registrar('alerta', montaje(moduloAlerta, 'Alerta · GPIO27', HX - 1.4, 24.5, -6.0, { rotY: DER, pared: 1.4, etq: 3.4 }));
+  registrar('extractor', montaje(ventExtractor, 'Extractor PB · GPIO25', HX + T / 2, YV_PB - 0.05, 0, { rotY: IZQ, poste: 0, etq: 5.2 }));
+  registrar('extractor2', montaje(ventExtractor2, 'Extractor PA · GPIO26', HX + T / 2, YV_PA - 0.05, 0, { rotY: IZQ, poste: 0, etq: 4.8 }));
+  registrar('alerta', montaje(moduloAlerta, 'Alarma · GPIO27', HX - 1.4, 24.5, -6.0, { rotY: DER, pared: 1.4, etq: 3.4 }));
 
-  // placa adaptadora que tapa cada ventana alrededor del ventilador
+  // placa adaptadora que tapa cada ventana alrededor del extractor
   [YV_PB, YV_PA].forEach(function (yv, i) {
     const y = i ? VL.alto : VL.bajo;
     const s = arcoP(new THREE.Shape(), VL.z0, y[0], VL.z1, y[1]);
@@ -1217,41 +1222,41 @@ function main(){
     gSensores.add(aLado(pieza(s, 0.2, [mSoporte, mSoporte], 'adaptador_ventilador'), HX + T / 2 + 0.1));
   });
 
-  // --- manojos de cable. Terminales: protoboard (sensores) y clemas de los relevadores (actuadores)
-  const RELE = { x: 11.95, ch1: -7.0, ch2: -9.3, ch3: -11.6 };
+  // --- manojos de cable. Cada uno sale por la esquina trasera de su lado y
+  // termina en la protoboard (sensores) o en la clema de su relevador (actuadores)
+  function colaIzq(xc, zt, xt) {
+    return [[xc, 0.4, HZB + 0.6], [xc, 0.4, HZB - 0.4], [xc + 0.3, 0.3, BZ0 - 0.2], [-17.4, 0.32, zt + 0.3], [-16.4, 0.95, zt], [xt, 0.95, zt]];
+  }
+  const RELE = { x: 11.95, ch1: TZC + 2.3, ch2: TZC, ch3: TZC - 2.3 };
+  function colaDer(xc, zc) {
+    return [[xc, 0.4, HZB + 0.6], [xc, 0.4, HZB - 0.4], [xc - 0.3, 0.3, BZ0 - 0.2], [14.2, 0.32, zc + 0.4], [12.9, 0.4, zc], [RELE.x, 0.9, zc]];
+  }
   const cables = [
-    // planta baja, izquierda: bajan por el muro a la canaleta del piso y salen hacia la protoboard
-    [[[-17.8, 6.55, -6.5], [-18.4, 6.2, -5.2], [LX, 5.6, -4.4], [LX, 1.4, -4.4], [-18.95, 0.4, -4.9],
-      [-18.95, 0.4, -5.7], [-18.6, 0.38, -6.4], [-18.0, 0.35, -9.0], [-17.2, 0.4, -9.7], [-16.4, 0.95, -9.7], [-13.2, 0.95, -9.7]],
+    // planta baja, izquierda: bajan por el muro a la canaleta del piso y siguen hasta la esquina trasera
+    [[[-17.8, 6.55, -6.5], [-18.4, 6.2, -5.2], [LX, 5.6, -4.4], [LX, 1.4, -4.4], [-18.75, 0.4, -4.9]].concat(colaIzq(-18.75, TZC + 0.2, -13.8)),
      [CAB.rojo, CAB.negro, CAB.amarillo]],                                     // MQ135
-    [[[-17.8, 14.55, 6.5], [-18.4, 14.2, 5.2], [LX, 13.6, 4.4], [LX, 1.4, 4.4], [-18.95, 0.4, 3.9],
-      [-18.95, 0.4, -5.7], [-18.75, 0.38, -6.4], [-18.2, 0.35, -8.3], [-17.2, 0.4, -9.0], [-16.4, 0.95, -9.0], [-14.0, 0.95, -9.0]],
+    [[[-17.8, 14.55, 6.5], [-18.4, 14.2, 5.2], [LX, 13.6, 4.4], [LX, 1.4, 4.4], [-18.95, 0.4, 3.9]].concat(colaIzq(-18.95, TZC + 0.9, -14.4)),
      [CAB.rojo, CAB.negro, CAB.verde]],                                        // MQ2
-    [[[-17.8, 8.05, 10.6], [-18.4, 7.8, 9.3], [LX, 7.2, 8.6], [LX, 1.4, 8.6], [-18.95, 0.4, 8.1],
-      [-18.95, 0.4, -5.7], [-18.95, 0.38, -6.4], [-18.4, 0.35, -7.6], [-17.2, 0.4, -8.3], [-16.4, 0.95, -8.3], [-14.8, 0.95, -8.3]],
-     [CAB.rojo, CAB.negro, CAB.azul]],                                         // DHT22 PB
+    [[[-17.8, 8.05, 10.6], [-18.4, 7.8, 9.3], [LX, 7.2, 8.6], [LX, 1.4, 8.6], [-19.1, 0.4, 8.1]].concat(colaIzq(-19.1, TZC + 1.6, -15.0)),
+     [CAB.rojo, CAB.negro, CAB.azul]],                                         // DHT22
     [[[-11.4, 11.6, HZF - 1.8], [-12.4, 11.3, 12.2], [-14.8, 11.0, 12.45], [-18.6, 10.8, 12.45], [LX, 9.6, 12.4], [LX, 1.4, 12.3],
-      [-18.95, 0.4, 11.6], [-18.95, 0.4, -5.7], [-19.1, 0.38, -6.4], [-18.6, 0.35, -7.0], [-17.2, 0.4, -7.6], [-16.4, 0.95, -7.6], [-15.6, 0.95, -7.6]],
+      [-19.15, 0.4, 11.6]].concat(colaIzq(-19.15, TZC + 2.3, -15.6)),
      [CAB.rojo, CAB.negro, CAB.amarillo, CAB.azul]],                           // GP2Y1010
-    // buhardilla, izquierda: por el piso de la buhardilla a la canaleta vertical y abajo a la protoboard
-    [[[-17.8, 24.05, -6.0], [-18.4, 23.7, -7.3], [LX, 23.0, -8.0], [LX, 18.75, -8.6], [LX, 18.72, -10.8],
-      [-18.95, 19.6, -12.2], [-18.95, 19.0, -12.7], [-18.95, 1.4, -12.7], [-18.3, 0.6, -12.6], [-17.2, 0.4, -11.8], [-16.4, 0.95, -11.8], [-15.4, 0.95, -11.8]],
-     [CAB.rojo, CAB.negro, CAB.morado]],                                       // DHT22 PA
+    // buhardilla: por el piso de la buhardilla a la canaleta vertical izquierda
     [[[0, 19.55, HZF - 1.0], [-0.6, 18.75, 12.35], [-6.0, 18.68, 12.4], [-17.6, 18.68, 12.4], [-18.35, 18.68, 11.6], [-18.35, 18.68, -10.8],
-      [-18.7, 19.6, -12.2], [-18.7, 19.0, -12.7], [-18.7, 1.0, -12.7], [-18.1, 0.5, -12.3], [-17.2, 0.4, -11.0], [-16.4, 0.95, -11.0], [-14.4, 0.95, -11.0]],
+      [-18.6, 19.6, -12.2], [-18.6, 19.0, -12.7], [-18.6, 1.0, -12.7]].concat(colaIzq(-18.55, TZC - 0.5, -13.2)),
      [CAB.rojo, CAB.negro, CAB.amarillo, CAB.verde]],                          // BH1750
-    // actuadores, derecha: a las clemas de cada canal
-    [[[18.85, YV_PB + 0.2, 1.4], [RX, YV_PB - 0.6, 2.4], [RX, 1.4, 2.4], [18.95, 0.4, 1.9], [18.95, 0.4, -5.2],
-      [18.6, 0.38, -6.0], [15.0, 0.35, -6.5], [13.0, 0.4, RELE.ch1], [RELE.x, 0.9, RELE.ch1]],
-     [CAB.rojo, CAB.negro]],                                                   // extractor -> canal 1
+    // actuadores, derecha
+    [[[18.85, YV_PB + 0.2, 1.4], [RX, YV_PB - 0.6, 2.4], [RX, 1.4, 2.4], [18.95, 0.4, 1.9]].concat(colaDer(18.95, RELE.ch1)),
+     [CAB.rojo, CAB.negro]],                                                   // extractor PB -> canal 1
     [[[18.85, YV_PA + 0.6, 1.4], [18.4, YV_PA - 0.6, 1.2], [18.4, 18.72, 0.2], [18.4, 18.72, -10.8],
-      [18.7, 19.6, -12.2], [18.7, 19.0, -12.7], [18.7, 1.4, -12.7], [18.0, 0.5, -12.2], [15.2, 0.35, -11.0], [13.2, 0.35, -9.6], [RELE.x, 0.9, RELE.ch2]],
-     [CAB.rojo, CAB.negro]],                                                   // ventilación -> canal 2
+      [18.65, 19.6, -12.2], [18.65, 19.0, -12.7], [18.65, 1.4, -12.7]].concat(colaDer(18.65, RELE.ch2)),
+     [CAB.rojo, CAB.negro]],                                                   // extractor PA -> canal 2
     [[[18.0, 24.05, -6.0], [18.6, 23.7, -7.3], [RX, 23.0, -8.0], [RX, 18.75, -8.6], [RX, 18.72, -10.8],
-      [18.95, 19.6, -12.2], [18.95, 19.0, -12.75], [18.95, 0.9, -12.75], [18.2, 0.4, -12.85], [14.6, 0.35, -12.65], [12.9, 0.4, -11.9], [RELE.x, 0.9, RELE.ch3]],
-     [CAB.rojo, CAB.negro, CAB.naranja]],                                      // alerta -> canal 3
+      [19.05, 19.6, -12.2], [19.05, 19.0, -12.75], [19.05, 1.0, -12.75]].concat(colaDer(19.05, RELE.ch3)),
+     [CAB.rojo, CAB.negro, CAB.naranja]],                                      // alarma -> canal 3
     // del ESP32 a las entradas del módulo de relevadores
-    [[[-0.6, 1.15, -8.6], [1.4, 0.7, -6.6], [5.0, 0.35, -5.2], [10.6, 0.35, -5.0], [11.75, 0.35, -5.9]],
+    [[[-0.6, 1.15, TZC + 1.1], [1.4, 0.7, TZC + 3.1], [5.0, 0.35, TZC + 4.3], [10.6, 0.35, TZC + 4.4], [11.75, 0.35, TZC + 3.6]],
      [CAB.naranja, CAB.blanco, CAB.morado, CAB.rojo, CAB.negro]]
   ];
   cables.forEach(function (c) { gSensores.add(manojo(c[0], c[1])); });
@@ -1321,7 +1326,7 @@ function main(){
     tresc:  { theta: 0.62, phi: 1.12, radio: 112, y: 18, z: 4 },
     frente: { theta: 0.0,  phi: 1.42, radio: 100, y: 19, z: 4 },
     lado:   { theta: 1.57, phi: 1.42, radio: 100, y: 19, z: 4 },
-    atras:  { theta: Math.PI - 0.42, phi: 1.2, radio: 86, y: 13, z: -3 },   // por la parte abierta: ve la instalación
+    atras:  { theta: Math.PI - 0.42, phi: 1.2, radio: 92, y: 12, z: -7 },   // por la parte abierta: ve la instalación y el tablero
     planta: { theta: 0.0,  phi: 0.16, radio: 100, y: 10, z: 4 }
   };
   document.querySelectorAll('[data-vista]').forEach(function (b) {
@@ -1375,33 +1380,31 @@ function main(){
     { id: 'pb_pm',   planta: 'pb', corto: 'polvo', nombre: 'Polvo · GP2Y1010',     mod: 'polvo', unidad: 'µg/m³', min: 0,   max: 600,  paso: 5,   dec: 0, ini: 40,  acep: 150,  crit: 300 },
     { id: 'pb_voc',  planta: 'pb', corto: 'voc',   nombre: 'Aire viciado · MQ135', mod: 'mq135', unidad: 'ADC',   min: 0,   max: 4095, paso: 5,   dec: 0, ini: 900, acep: 1500, crit: 2500 },
     { id: 'pb_humo', planta: 'pb', corto: 'humo',  nombre: 'Humo y gas · MQ2',     mod: 'mq2',   unidad: 'ADC',   min: 0,   max: 4095, paso: 5,   dec: 0, ini: 600, acep: 1200, crit: 2200 },
-    { id: 'pb_temp', planta: 'pb', corto: 'T',     nombre: 'Temperatura · DHT22',  mod: 'dhtPB', unidad: '°C',    min: -10, max: 50,   paso: 0.5, dec: 1, ini: 24,  acep: 28,   crit: 34 },
-    { id: 'pb_hum',  planta: 'pb', corto: 'H',     nombre: 'Humedad · DHT22',      mod: 'dhtPB', unidad: '%',     min: 0,   max: 100,  paso: 1,   dec: 0, ini: 50,  acep: 70,   crit: 85 },
-    { id: 'pa_temp', planta: 'pa', corto: 'T',     nombre: 'Temperatura · DHT22',  mod: 'dhtPA', unidad: '°C',    min: -10, max: 50,   paso: 0.5, dec: 1, ini: 25,  acep: 28,   crit: 34 },
-    { id: 'pa_hum',  planta: 'pa', corto: 'H',     nombre: 'Humedad · DHT22',      mod: 'dhtPA', unidad: '%',     min: 0,   max: 100,  paso: 1,   dec: 0, ini: 48,  acep: 70,   crit: 85 },
+    { id: 'pb_temp', planta: 'pb', corto: 'T',     nombre: 'Temperatura · DHT22',  mod: 'dht',   unidad: '°C',    min: -10, max: 50,   paso: 0.5, dec: 1, ini: 24,  acep: 28,   crit: 34 },
+    { id: 'pb_hum',  planta: 'pb', corto: 'H',     nombre: 'Humedad · DHT22',      mod: 'dht',   unidad: '%',     min: 0,   max: 100,  paso: 1,   dec: 0, ini: 50,  acep: 70,   crit: 85 },
     { id: 'pa_lux',  planta: 'pa', corto: 'lux',   nombre: 'Iluminación · BH1750', mod: 'bh',    unidad: 'lx',    min: 0,   max: 2000, paso: 10,  dec: 0, ini: 320 }
   ];
   // tópico MQTT = aircare/<planta>/<variable>  (README §5)
   VARS.forEach(function (v) { v.topico = 'aircare/' + v.planta + '/' + v.id.split('_')[1]; });
 
   const ACTS = [
-    { id: 'extractor',   nombre: 'Extractor',           gpio: 25 },
-    { id: 'ventilacion', nombre: 'Ventilación cruzada', gpio: 26 },
-    { id: 'alerta',      nombre: 'Alerta roja',         gpio: 27 }
+    { id: 'extractor',   nombre: 'Extractor PB',          gpio: 25 },
+    { id: 'extractor2',  nombre: 'Extractor PA',          gpio: 26 },
+    { id: 'alerta',      nombre: 'Alarma (LED + buzzer)', gpio: 27 }
   ];
 
   const ESCENARIOS = {
     'Normal':    {},
     'Cocinando': { pb_voc: 1850, pb_humo: 1450, pb_temp: 29, pb_hum: 64 },
     'Polvo':     { pb_pm: 230 },
-    'Calor':     { pa_temp: 31.5, pb_temp: 29.5, pa_hum: 38 },
+    'Calor':     { pb_temp: 31.5, pb_hum: 38 },
     'Incendio':  { pb_humo: 3300, pb_pm: 420, pb_voc: 2900, pb_temp: 37, pa_lux: 90 }
   };
 
   const NIVELES = ['Saludable', 'Aceptable', 'Crítico'];
   const sim = {
     corriendo: false, t0: 0, ultimo: 0, modo: 'auto',
-    valores: {}, act: {}, vel: { extractor: 0, ventilacion: 0 },
+    valores: {}, act: {}, vel: { extractor: 0, extractor2: 0 },
     destello: 0, sonido: false, mqtt: false, faseAlerta: false
   };
   ACTS.forEach(function (a) { sim.act[a.id] = false; });
@@ -1428,7 +1431,7 @@ function main(){
       causas: causas,
       cmd: {
         extractor: gas >= 1 || estado === 2,
-        ventilacion: ambiente >= 1 || estado === 2,
+        extractor2: ambiente >= 1 || estado === 2,
         alerta: estado === 2
       }
     };
@@ -1581,7 +1584,7 @@ function main(){
     const f = function (id) { return formato(filas[id].v, val[id]); };
     log('PB polvo=' + f('pb_pm') + ' voc=' + f('pb_voc') + ' humo=' + f('pb_humo') +
         ' T=' + f('pb_temp') + ' H=' + f('pb_hum') +
-        ' | PA T=' + f('pa_temp') + ' H=' + f('pa_hum') + ' lux=' + f('pa_lux'));
+        ' | PA lux=' + f('pa_lux'));
     if (sim.mqtt) {
       const ts = Math.round(ahora - sim.t0);
       VARS.forEach(function (v) {
@@ -1707,7 +1710,7 @@ function main(){
       sim.ultimo = ahora;
       ciclo(ahora);
     }
-    [['extractor', ventExtractor], ['ventilacion', ventCruzada]].forEach(function (p) {
+    [['extractor', ventExtractor], ['extractor2', ventExtractor2]].forEach(function (p) {
       const meta = sim.act[p[0]] ? 1 : 0;
       sim.vel[p[0]] += (meta - sim.vel[p[0]]) * Math.min(1, dt * 1.4);
       p[1].userData.rotor.rotation.z -= sim.vel[p[0]] * dt * 28;
