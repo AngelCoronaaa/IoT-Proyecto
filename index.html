@@ -161,7 +161,7 @@
     <hr>
     <button class="exportar" id="btn-obj">Descargar modelo .obj</button>
     <p class="pie">Se descargan dos archivos (.obj y .mtl). Ábrelos juntos en Blender, SketchUp o Three.js.</p>
-    <p class="medidas">Escala: 1 unidad = 1 cm (medidas estimadas de las fotos). Base 44 × 38 cm, casa 39.4 × 26.3 cm, cumbrera a 42 cm.<br>Dentro: un sensor de cada tipo, 2 extractores (40 y 60 mm), la alarma en el techo y el LED de estado. La electrónica (ESP32 en protoboard de 830 puntos y 3 etapas con transistor TIP120 en una de 400) va fuera, en un tablero detrás de la base; usa la vista «Atrás» para verla.</p>
+    <p class="medidas">Escala: 1 unidad = 1 cm (medidas estimadas de las fotos). Base 44 × 38 cm, casa 39.4 × 26.3 cm, cumbrera a 42 cm.<br>Dentro: un sensor de cada tipo, 2 extractores (40 y 60 mm), la alarma en el techo y el LED de estado. La electrónica (ESP32 en protoboard de 830 puntos y 3 etapas con transistor 2N2222 en una de 400) va fuera, en un tablero detrás de la base; usa la vista «Atrás» para verla.</p>
   </div>
 </div>
 
@@ -764,7 +764,6 @@ function main(){
   const texSilkMQ135 = silk(320, 220, 'MQ-135', ['AO', 'DO', 'GND', 'VCC']);
   const texSilkMQ2   = silk(320, 220, 'MQ-2', ['AO', 'DO', 'GND', 'VCC']);
   const texSilkDht   = silk(300, 200, 'DHT22 / AM2302', ['DATA', 'VCC', 'GND']);
-  const texSilkBh    = silk(190, 140, 'GY-302', ['ADDR', 'SDA', 'SCL', 'GND', 'VCC']);
   const texSilkAlerta= silk(320, 160, 'BUZZER', ['GND', 'I/O', 'VCC']);
   const texSilkRgb   = silk(300, 190, 'RGB LED', ['R', 'G', 'B', 'GND'], '#141519');
 
@@ -936,18 +935,6 @@ function main(){
     return g;
   }
 
-  // ---- BH1750 (GY-302): iluminación por I2C
-  function modBH1750() {
-    const g = new THREE.Group();
-    g.name = 'bh1750';
-    g.add(placa(1.9, 0.16, 1.4, mPcbAzul, mapa(texSilkBh), 0, 0, 0, 'bh1750_placa'));
-    g.add(caja(0.32, 0.14, 0.32, M(0xe9e6dd, { roughness: 0.5 }), -0.42, 0.15, 0.18, 'bh1750_sensor'));
-    g.add(caja(0.3, 0.11, 0.24, mNegroMate, 0.1, 0.135, -0.3, 'regulador_bh'));
-    g.add(caja(0.16, 0.09, 0.14, M(0xc2ac74, { roughness: 0.6 }), 0.1, 0.125, 0.22, 'condensador'));
-    g.add(pines(5, 0.62, -0.205, 0, true));
-    return g;
-  }
-
   // tira de pines acodados en el borde de la placa: salen paralelos a ella
   // (hacia +x local, o hacia +z con haciaZ) para que la placa se pueda pegar plana
   function pinesAcodados(n, x, y, z, haciaZ) {
@@ -1007,19 +994,26 @@ function main(){
     return g;
   }
 
-  // ---- Etapa de potencia con transistor: TIP120 (TO-220) en emisor común,
-  // resistencia de base de 1 kΩ y diodo 1N4007 de protección en paralelo con la carga
+  // ---- Etapa de potencia con transistor NPN 2N2222 (encapsulado TO-92, la
+  // "bolita" negra de media luna) en emisor común, resistencia de base de 1 kΩ
+  // y diodo 1N4007 de protección en paralelo con la carga
   const mResistencia = M(0xd8c8a0, { roughness: 0.6 });
   function modEtapa() {
     const g = new THREE.Group();
     g.name = 'etapa_transistor';
-    g.add(caja(1.0, 1.5, 0.45, mNegroMate, 0, 1.35, 0, 'tip120'));
-    const aleta = caja(1.0, 1.05, 0.13, mEscudo, 0, 2.6, -0.16, 'aleta_tip120');
-    g.add(aleta);
-    const agujero = cil(0.18, 0.15, mNegroMate, 0, 2.75, -0.16, 12);
-    agujero.rotation.x = Math.PI / 2;
-    g.add(agujero);
-    [-0.254, 0, 0.254].forEach(function (x) { g.add(caja(0.08, 0.6, 0.05, mEscudo, x, 0.3, 0, 'pata_tip120')); });
+    // cuerpo TO-92: medio cilindro con la cara plana hacia -z local
+    const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.5, 20, 1, false, Math.PI / 2, Math.PI), mNegroMate);
+    cuerpo.position.set(0, 0.85, 0);
+    cuerpo.castShadow = true;
+    cuerpo.name = 'to92_2n2222';
+    g.add(cuerpo);
+    g.add(caja(0.48, 0.5, 0.02, mNegroMate, 0, 0.85, 0, 'to92_cara_plana'));
+    const tapa = new THREE.Mesh(new THREE.CircleGeometry(0.24, 20, 0, Math.PI), mNegroMate);
+    tapa.rotation.x = -Math.PI / 2;
+    tapa.position.set(0, 1.1, 0);
+    tapa.name = 'to92_tapa';
+    g.add(tapa);
+    [-0.127, 0, 0.127].forEach(function (x) { g.add(caja(0.05, 0.6, 0.04, mEscudo, x, 0.3, 0, 'pata_2n2222')); });
     // diodo acostado, con su franja de cátodo
     const d = cil(0.13, 0.55, mNegroMate, 0, 0.2, 1.0, 12);
     d.rotation.z = Math.PI / 2;
@@ -1256,8 +1250,6 @@ function main(){
   registrar('dht', montaje(modDHT22(), 'DHT22 · GPIO4', -HX + 1.6, 8.5, 10.6, { rotY: IZQ, pared: 1.6, etq: 3.6 }));
   registrar('polvo', montaje(modPolvo(), 'GP2Y1010 · 32 / 33', -11.4, 12.0, HZF - 1.8, { rotY: FRENTE, pared: 1.8, etq: 2.9 }));
 
-  // --- buhardilla: BH1750 junto a la ventana del hastial frontal (el centro lo ocupa el extractor)
-  registrar('bh', montaje(modBH1750(), 'BH1750 · I2C 21 / 22', -5.0, 20.0, HZF - 1.0, { rotY: FRENTE, poste: 20.0 - 0.26 - yA, etq: 1.9 }));
 
   // --- actuadores: extractor de 40 mm en la ventana baja del costado derecho,
   // extractor de 60 mm pegado por dentro a la ventana del hastial frontal (más
@@ -1314,10 +1306,6 @@ function main(){
     [[[-11.4, 11.6, HZF - 1.8], [-12.4, 11.3, 12.2], [-14.8, 11.0, 12.45], [-18.6, 10.8, 12.45], [LX, 9.6, 12.4], [LX, 1.4, 12.3],
       [-19.15, 0.4, 11.6]].concat(colaIzq(-19.15, TZC + 2.3, -15.6)),
      [CAB.rojo, CAB.negro, CAB.amarillo, CAB.azul]],                           // GP2Y1010
-    // buhardilla: por el piso de la buhardilla a la canaleta vertical izquierda
-    [[[-5.0, 19.55, HZF - 1.0], [-5.6, 18.75, 12.35], [-8.0, 18.68, 12.4], [-17.6, 18.68, 12.4], [-18.35, 18.68, 11.6], [-18.35, 18.68, -10.8],
-      [-18.6, 19.6, -12.2], [-18.6, 19.0, -12.7], [-18.6, 1.0, -12.7]].concat(colaIzq(-18.55, TZC - 0.5, -13.2)),
-     [CAB.rojo, CAB.negro, CAB.amarillo, CAB.verde]],                          // BH1750
     // actuadores, derecha
     [[[18.85, YV_PB + 0.2, 1.4], [RX, YV_PB - 0.6, 2.4], [RX, 1.4, 2.4], [18.95, 0.4, 1.9]].concat(colaDer(18.95, ETAPA.ch1)),
      [CAB.rojo, CAB.negro]],                                                   // extractor PB -> canal 1
@@ -1460,8 +1448,7 @@ function main(){
     { id: 'pb_voc',  planta: 'pb', corto: 'voc',   nombre: 'Aire viciado · MQ135', mod: 'mq135', unidad: 'ADC',   min: 0,   max: 4095, paso: 5,   dec: 0, ini: 900, acep: 1500, crit: 2500 },
     { id: 'pb_humo', planta: 'pb', corto: 'humo',  nombre: 'Humo y gas · MQ2',     mod: 'mq2',   unidad: 'ADC',   min: 0,   max: 4095, paso: 5,   dec: 0, ini: 600, acep: 1200, crit: 2200 },
     { id: 'pb_temp', planta: 'pb', corto: 'T',     nombre: 'Temperatura · DHT22',  mod: 'dht',   unidad: '°C',    min: -10, max: 50,   paso: 0.5, dec: 1, ini: 24,  acep: 28,   crit: 34 },
-    { id: 'pb_hum',  planta: 'pb', corto: 'H',     nombre: 'Humedad · DHT22',      mod: 'dht',   unidad: '%',     min: 0,   max: 100,  paso: 1,   dec: 0, ini: 50,  acep: 70,   crit: 85 },
-    { id: 'pa_lux',  planta: 'pa', corto: 'lux',   nombre: 'Iluminación · BH1750', mod: 'bh',    unidad: 'lx',    min: 0,   max: 2000, paso: 10,  dec: 0, ini: 320 }
+    { id: 'pb_hum',  planta: 'pb', corto: 'H',     nombre: 'Humedad · DHT22',      mod: 'dht',   unidad: '%',     min: 0,   max: 100,  paso: 1,   dec: 0, ini: 50,  acep: 70,   crit: 85 }
   ];
   // tópico MQTT = aircare/<planta>/<variable>  (README §5)
   VARS.forEach(function (v) { v.topico = 'aircare/' + v.planta + '/' + v.id.split('_')[1]; });
@@ -1477,7 +1464,7 @@ function main(){
     'Cocinando': { pb_voc: 1850, pb_humo: 1450, pb_temp: 29, pb_hum: 64 },
     'Polvo':     { pb_pm: 230 },
     'Calor':     { pb_temp: 31.5, pb_hum: 38 },
-    'Incendio':  { pb_humo: 3300, pb_pm: 420, pb_voc: 2900, pb_temp: 37, pa_lux: 90 }
+    'Incendio':  { pb_humo: 3300, pb_pm: 420, pb_voc: 2900, pb_temp: 37 }
   };
 
   const NIVELES = ['Saludable', 'Aceptable', 'Crítico'];
@@ -1536,7 +1523,7 @@ function main(){
   // ---- controles de sensores
   const filas = {};
   const contSensores = document.getElementById('sim-sensores');
-  ['pb', 'pa'].forEach(function (planta) {
+  ['pb', 'pa'].filter(function (p) { return VARS.some(function (v) { return v.planta === p; }); }).forEach(function (planta) {
     const t = document.createElement('div');
     t.className = 'planta';
     t.textContent = planta === 'pb' ? 'Planta baja' : 'Planta alta';
@@ -1661,8 +1648,7 @@ function main(){
     const val = sim.valores;
     const f = function (id) { return formato(filas[id].v, val[id]); };
     log('PB polvo=' + f('pb_pm') + ' voc=' + f('pb_voc') + ' humo=' + f('pb_humo') +
-        ' T=' + f('pb_temp') + ' H=' + f('pb_hum') +
-        ' | PA lux=' + f('pa_lux'));
+        ' T=' + f('pb_temp') + ' H=' + f('pb_hum'));
     if (sim.mqtt) {
       const ts = Math.round(ahora - sim.t0);
       VARS.forEach(function (v) {
