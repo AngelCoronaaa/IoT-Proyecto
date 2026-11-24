@@ -161,7 +161,7 @@
     <hr>
     <button class="exportar" id="btn-obj">Descargar modelo .obj</button>
     <p class="pie">Se descargan dos archivos (.obj y .mtl). Ábrelos juntos en Blender, SketchUp o Three.js.</p>
-    <p class="medidas">Escala: 1 unidad = 1 cm (medidas estimadas de las fotos). Base 44 × 38 cm, casa 39.4 × 26.3 cm, cumbrera a 42 cm.<br>Dentro: un sensor de cada tipo, 2 extractores y 1 alarma. La electrónica (ESP32 en protoboard de 830 puntos y 3 relevadores) va fuera, en un tablero detrás de la base; usa la vista «Atrás» para verla.</p>
+    <p class="medidas">Escala: 1 unidad = 1 cm (medidas estimadas de las fotos). Base 44 × 38 cm, casa 39.4 × 26.3 cm, cumbrera a 42 cm.<br>Dentro: un sensor de cada tipo, 2 extractores (40 y 60 mm), la alarma en el techo y el LED de estado. La electrónica (ESP32 en protoboard de 830 puntos y 3 etapas con transistor TIP120 en una de 400) va fuera, en un tablero detrás de la base; usa la vista «Atrás» para verla.</p>
   </div>
 </div>
 
@@ -512,16 +512,17 @@ function main(){
     gBajo.add(c);
     persianasFrente(v[0], v[1], v[2], v[3]);
   });
-  const cancelH = cancel(VENT_H[0], VENT_H[1], VENT_H[2], VENT_H[3], { arco: true, cols: 2, filas: 2 });
+  // la ventana del hastial frontal lleva el extractor de la buhardilla: sin barrotes
+  const cancelH = cancel(VENT_H[0], VENT_H[1], VENT_H[2], VENT_H[3], { arco: true, sinBarras: true });
   cancelH.position.z = HZF;
   gBajo.add(cancelH);
   persianasFrente(VENT_H[0], VENT_H[1], VENT_H[2], VENT_H[3]);
 
-  // las dos ventanas del costado derecho llevan ventilador: quedan sin barrotes
+  // la ventana baja del costado derecho lleva el extractor de planta baja: sin barrotes
   [[-1, -HX], [1, HX + T]].forEach(function (lado) {
     ['bajo', 'alto'].forEach(function (nivel) {
       const y = VL[nivel];
-      gBajo.add(aLado(cancel(VL.z0, y[0], VL.z1, y[1], { arco: true, cols: 2, filas: 2, sinBarras: lado[0] > 0 }), lado[1]));
+      gBajo.add(aLado(cancel(VL.z0, y[0], VL.z1, y[1], { arco: true, cols: 2, filas: 2, sinBarras: lado[0] > 0 && nivel === 'bajo' }), lado[1]));
       persianasLado(lado[0], y[0], y[1]);
     });
   });
@@ -728,6 +729,7 @@ function main(){
   const mBlancoPl = M(0xf2f1ec, { roughness: 0.6 });
   const mAspa     = M(0x2a2c31, { roughness: 0.55 });
   const mSoporte  = M(0x8e8880, { roughness: 0.85 });
+  const mCinta    = M(0xeceae2, { roughness: 0.95 });   // cinta doble cara de espuma
   const LED = (c, e) => new THREE.MeshStandardMaterial({ color: c, emissive: e, emissiveIntensity: 0.9, roughness: 0.3 });
   const mLedRojo  = LED(0xff5a49, 0xff2a17);
   const mLedAzul  = LED(0x7ab8ff, 0x2b7ae0);
@@ -763,8 +765,8 @@ function main(){
   const texSilkMQ2   = silk(320, 220, 'MQ-2', ['AO', 'DO', 'GND', 'VCC']);
   const texSilkDht   = silk(300, 200, 'DHT22 / AM2302', ['DATA', 'VCC', 'GND']);
   const texSilkBh    = silk(190, 140, 'GY-302', ['ADDR', 'SDA', 'SCL', 'GND', 'VCC']);
-  const texSilkRele  = silk(375, 275, 'RELAY 3CH 5V', ['IN1', 'IN2', 'IN3', 'GND', 'VCC']);
-  const texSilkAlerta= silk(320, 200, 'ALERTA GPIO27', ['SIG', 'VCC', 'GND']);
+  const texSilkAlerta= silk(320, 160, 'BUZZER', ['GND', 'I/O', 'VCC']);
+  const texSilkRgb   = silk(300, 190, 'RGB LED', ['R', 'G', 'B', 'GND'], '#141519');
 
   const texSilkEsp = tex(512, 284, function (g) {
     g.fillStyle = '#15161a'; g.fillRect(0, 0, 512, 284);
@@ -785,27 +787,31 @@ function main(){
     g.fillText('ESP32 DEVKIT V1', 382, 142);
   }, 1, 1);
 
-  const texProto = tex(660, 216, function (g) {
-    g.fillStyle = '#edeae3'; g.fillRect(0, 0, 660, 216);
-    g.strokeStyle = '#c0473c'; g.lineWidth = 2.6;
-    g.beginPath(); g.moveTo(18, 7);   g.lineTo(642, 7);   g.stroke();
-    g.beginPath(); g.moveTo(18, 209); g.lineTo(642, 209); g.stroke();
-    g.strokeStyle = '#3a63b8';
-    g.beginPath(); g.moveTo(18, 39);  g.lineTo(642, 39);  g.stroke();
-    g.beginPath(); g.moveTo(18, 177); g.lineTo(642, 177); g.stroke();
-    g.fillStyle = '#dedad0'; g.fillRect(0, 100, 660, 16);
-    g.fillStyle = '#3a3a3e';
-    function fila(y, saltar) {
-      for (let i = 0; i < 63; i++) {
-        if (saltar && i % 6 === 5) continue;
-        g.fillRect(22 + i * 9.8, y, 3, 3);
+  // protoboard: 63 columnas = 830 puntos, 30 columnas = 400 puntos
+  function texProtoboard(cols) {
+    const W = Math.round(40 + cols * 9.8);
+    return tex(W, 216, function (g) {
+      g.fillStyle = '#edeae3'; g.fillRect(0, 0, W, 216);
+      g.strokeStyle = '#c0473c'; g.lineWidth = 2.6;
+      g.beginPath(); g.moveTo(18, 7);   g.lineTo(W - 18, 7);   g.stroke();
+      g.beginPath(); g.moveTo(18, 209); g.lineTo(W - 18, 209); g.stroke();
+      g.strokeStyle = '#3a63b8';
+      g.beginPath(); g.moveTo(18, 39);  g.lineTo(W - 18, 39);  g.stroke();
+      g.beginPath(); g.moveTo(18, 177); g.lineTo(W - 18, 177); g.stroke();
+      g.fillStyle = '#dedad0'; g.fillRect(0, 100, W, 16);
+      g.fillStyle = '#3a3a3e';
+      function fila(y, saltar) {
+        for (let i = 0; i < cols; i++) {
+          if (saltar && i % 6 === 5) continue;
+          g.fillRect(22 + i * 9.8, y, 3, 3);
+        }
       }
-    }
-    [18, 28].forEach(function (y) { fila(y, true); });
-    [188, 198].forEach(function (y) { fila(y, true); });
-    [56, 66, 76, 86, 96].forEach(function (y) { fila(y, false); });
-    [120, 130, 140, 150, 160].forEach(function (y) { fila(y, false); });
-  }, 1, 1);
+      [18, 28].forEach(function (y) { fila(y, true); });
+      [188, 198].forEach(function (y) { fila(y, true); });
+      [56, 66, 76, 86, 96].forEach(function (y) { fila(y, false); });
+      [120, 130, 140, 150, 160].forEach(function (y) { fila(y, false); });
+    }, 1, 1);
+  }
 
   const texEtiqVent = tex(128, 128, function (g) {
     g.fillStyle = '#f4f2ec'; g.fillRect(0, 0, 128, 128);
@@ -942,55 +948,94 @@ function main(){
     return g;
   }
 
-  // ---- Alerta roja: LED de potencia + zumbador
+  // tira de pines acodados en el borde de la placa: salen paralelos a ella
+  // (hacia +x local, o hacia +z con haciaZ) para que la placa se pueda pegar plana
+  function pinesAcodados(n, x, y, z, haciaZ) {
+    const g = new THREE.Group();
+    const largo = n * 0.254;
+    g.add(caja(haciaZ ? largo : 0.25, 0.25, haciaZ ? 0.25 : largo, mNegroMate, 0, 0, 0, 'tira_pines'));
+    for (let i = 0; i < n; i++) {
+      const d = (i - (n - 1) / 2) * 0.254;
+      g.add(caja(haciaZ ? 0.09 : 0.7, 0.09, haciaZ ? 0.7 : 0.09, mPinOro, haciaZ ? d : 0.4, 0, haciaZ ? 0.4 : d, 'pin'));
+    }
+    g.position.set(x, y, z);
+    return g;
+  }
+
+  // ---- Alarma: módulo de zumbador de 3 pines, pegado con cinta doble cara
   function modAlerta() {
     const g = new THREE.Group();
     g.name = 'alerta';
-    g.add(placa(3.2, 0.16, 2.0, mPcbAzul, mapa(texSilkAlerta), 0, 0, 0, 'alerta_placa'));
-    const rojo = LED(0xff4a38, 0xff1e08);
-    g.add(cil(0.25, 0.55, rojo, -0.95, 0.36, 0.25, 16));
-    const domo = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), rojo);
-    domo.position.set(-0.95, 0.63, 0.25);
-    domo.name = 'domo_led';
-    g.add(domo);
-    g.add(cil(0.3, 0.08, mNegroMate, -0.95, 0.12, 0.25, 16));
-    const zumbador = cil(0.6, 0.9, mNegroMate, 0.7, 0.53, 0.1, 20);
+    g.add(placa(3.0, 0.16, 1.5, mPcbAzul, mapa(texSilkAlerta), 0, 0, 0, 'alerta_placa'));
+    const zumbador = cil(0.6, 0.9, mNegroMate, -0.4, 0.53, 0, 20);
     zumbador.name = 'zumbador';
     g.add(zumbador);
-    g.add(cil(0.12, 0.06, M(0x45474b, { roughness: 0.9 }), 0.7, 0.99, 0.1, 12));
-    g.add(caja(0.42, 0.12, 0.36, mNegroMate, -0.2, 0.14, -0.62, 'transistor'));
-    g.add(pines(3, 1.35, -0.205, -0.5, true));
-    const luz = new THREE.PointLight(0xff3a20, 0, 16);
-    luz.position.set(-0.95, 1.4, 0.6);
+    g.add(cil(0.12, 0.06, M(0x45474b, { roughness: 0.9 }), -0.4, 0.99, 0, 12));
+    g.add(caja(0.42, 0.12, 0.36, mNegroMate, 0.75, 0.14, -0.35, 'transistor'));
+    g.add(pinesAcodados(3, 1.35, 0.21, 0));
+    g.add(caja(2.6, 0.12, 1.2, mCinta, 0, -0.14, 0, 'cinta_doble_cara'));
+    return g;
+  }
+
+  // ---- LED de estado RGB (cátodo común): verde = buena, amarillo = aceptable,
+  // rojo parpadeando = crítica. Va de pie contra el muro, mirando a +z local.
+  function modLedEstado() {
+    const g = new THREE.Group();
+    g.name = 'led_estado';
+    const p = new THREE.Group();            // placa armada acostada (componentes hacia +y)
+    p.add(placa(2.4, 0.16, 1.5, mPcbNegro, mapa(texSilkRgb), 0, 0, 0, 'led_rgb_placa'));
+    const difuso = new THREE.MeshStandardMaterial({ color: 0xe9ebee, emissive: 0x000000, emissiveIntensity: 1, roughness: 0.3 });
+    p.add(cil(0.25, 0.55, difuso, -0.35, 0.36, -0.1, 16));
+    const domo = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), difuso);
+    domo.position.set(-0.35, 0.63, -0.1);
+    domo.name = 'domo_led';
+    p.add(domo);
+    p.add(cil(0.3, 0.08, difuso, -0.35, 0.12, -0.1, 16));
+    [-0.35, 0, 0.35].forEach(function (z) {
+      p.add(caja(0.42, 0.12, 0.16, M(0x3f74c9, { roughness: 0.5 }), 0.65, 0.14, z - 0.1, 'resistencia'));
+    });
+    p.add(pinesAcodados(4, 0, 0.21, 0.6, true));   // pines hacia abajo una vez de pie
+    p.add(caja(2.0, 0.12, 1.1, mCinta, 0, -0.14, 0, 'cinta_doble_cara'));
+    p.rotation.x = Math.PI / 2;
+    g.add(p);
+    const luz = new THREE.PointLight(0xffffff, 0, 14);
+    luz.position.set(-0.35, 0.1, 1.4);
     luz.userData.noExport = true;
     g.add(luz);
-    g.userData.led = rojo;
+    g.userData.led = difuso;
     g.userData.luz = luz;
     return g;
   }
 
-  // ---- Módulo de 3 relevadores 5 V
-  function modRelevadores() {
+  // ---- Etapa de potencia con transistor: TIP120 (TO-220) en emisor común,
+  // resistencia de base de 1 kΩ y diodo 1N4007 de protección en paralelo con la carga
+  const mResistencia = M(0xd8c8a0, { roughness: 0.6 });
+  function modEtapa() {
     const g = new THREE.Group();
-    g.name = 'relevadores';
-    g.add(placa(7.5, 0.16, 5.5, mPcbAzul, mapa(texSilkRele), 0, 0, 0, 'rele_placa'));
-    const azulRele = M(0x2c5fb2, { roughness: 0.45 });
-    const verdeBorne = M(0x2f7a45, { roughness: 0.6 });
-    g.userData.leds = [];
-    [-2.3, 0, 2.3].forEach(function (x, i) {
-      g.add(caja(1.9, 1.55, 1.5, azulRele, x, 0.855, -1.25, 'rele' + i));
-      g.add(caja(1.6, 0.1, 1.2, M(0x24509a, { roughness: 0.4 }), x, 1.68, -1.25, 'tapa_rele' + i));
-      g.add(caja(1.7, 1.1, 1.25, verdeBorne, x, 0.63, 1.6, 'borne' + i));
-      for (let t = 0; t < 3; t++) {
-        g.add(cil(0.16, 0.12, mEscudo, x + (t - 1) * 0.52, 1.2, 1.6, 10));
-      }
-      g.add(caja(0.75, 0.28, 0.42, mNegroMate, x - 0.3, 0.22, 0.25, 'optoacoplador' + i));
-      const led = LED(0xff5a49, 0xff2a17);
-      g.userData.leds.push(led);
-      g.add(diodo(led, x + 0.55, 0.13, 0.35));
+    g.name = 'etapa_transistor';
+    g.add(caja(1.0, 1.5, 0.45, mNegroMate, 0, 1.35, 0, 'tip120'));
+    const aleta = caja(1.0, 1.05, 0.13, mEscudo, 0, 2.6, -0.16, 'aleta_tip120');
+    g.add(aleta);
+    const agujero = cil(0.18, 0.15, mNegroMate, 0, 2.75, -0.16, 12);
+    agujero.rotation.x = Math.PI / 2;
+    g.add(agujero);
+    [-0.254, 0, 0.254].forEach(function (x) { g.add(caja(0.08, 0.6, 0.05, mEscudo, x, 0.3, 0, 'pata_tip120')); });
+    // diodo acostado, con su franja de cátodo
+    const d = cil(0.13, 0.55, mNegroMate, 0, 0.2, 1.0, 12);
+    d.rotation.z = Math.PI / 2;
+    g.add(d);
+    const franja = cil(0.135, 0.08, mEscudo, 0.2, 0.2, 1.0, 12);
+    franja.rotation.z = Math.PI / 2;
+    g.add(franja);
+    // resistencia de base con bandas café-negro-rojo
+    const r = cil(0.11, 0.65, mResistencia, 0, 0.18, -0.95, 12);
+    r.rotation.z = Math.PI / 2;
+    g.add(r);
+    [[-0.17, 0x6b3b1d], [-0.05, 0x1a1a1a], [0.07, 0xb2322a]].forEach(function (b) {
+      const banda = cil(0.115, 0.05, M(b[1], { roughness: 0.6 }), b[0], 0.18, -0.95, 12);
+      banda.rotation.z = Math.PI / 2;
+      g.add(banda);
     });
-    g.add(pines(6, -2.9, -0.205, 2.35, false));
-    g.add(pines(3, 2.6, -0.205, 2.35, false));
     return g;
   }
 
@@ -1023,17 +1068,20 @@ function main(){
     return g;
   }
 
-  // ---- Protoboard de 830 puntos
-  function modProtoboard() {
+  // ---- Protoboard: 63 columnas (830 puntos) o 30 columnas (400 puntos)
+  function modProtoboard(cols) {
+    cols = cols || 63;
+    const largo = 16.5 * cols / 63;
     const g = new THREE.Group();
     g.name = 'protoboard';
-    g.add(placa(16.5, 0.85, 5.4, M(0xe4e0d8, { roughness: 0.7 }), mapa(texProto, 0.7), 0, 0, 0, 'protoboard_cuerpo'));
-    g.add(caja(15.9, 0.16, 0.4, M(0xd2cec4, { roughness: 0.8 }), 0, 0.38, 0, 'canal_central'));
+    g.add(placa(largo, 0.85, 5.4, M(0xe4e0d8, { roughness: 0.7 }), mapa(texProtoboard(cols), 0.7), 0, 0, 0, 'protoboard_cuerpo'));
+    g.add(caja(largo - 0.6, 0.16, 0.4, M(0xd2cec4, { roughness: 0.8 }), 0, 0.38, 0, 'canal_central'));
     return g;
   }
 
-  // ---- Ventilador 40 mm 5 V
-  function modVentilador() {
+  // ---- Ventilador 5 V: se modela de 40 mm y se escala al tamaño pedido (mm)
+  function modVentilador(mm) {
+    const k = (mm || 40) / 40;
     const g = new THREE.Group();
     g.name = 'ventilador';
     const L = 4.0, E = 1.0, B = 1.82;
@@ -1074,7 +1122,8 @@ function main(){
     }
     g.add(rotor);
     g.userData.rotor = rotor;
-    g.position.y = 2.05;   // el marco se apoya sobre la placa del soporte
+    g.scale.setScalar(k);
+    g.position.y = 2.05 * k;   // el marco se apoya sobre la placa del soporte
     return g;
   }
 
@@ -1146,7 +1195,7 @@ function main(){
   //  Instalación sobre la maqueta
   // ============================================================
   // Dentro de la casa solo hay un sensor de cada tipo, dos extractores y una
-  // alarma. Toda la electrónica (protoboard, ESP32 y relevadores) queda fuera,
+  // alarma. Toda la electrónica (protoboards, ESP32 y transistores) queda fuera,
   // en un tablero de control apoyado detrás de la base. Los cables bajan por
   // los muros a canaletas (una a ras de piso en cada costado y una vertical en
   // cada esquina trasera que sube a la buhardilla) y salen por la parte
@@ -1168,14 +1217,21 @@ function main(){
   etqEsp.position.set(-3.0, 3.6, TZC);
   gSensores.add(etqEsp);
 
-  // relevadores girados: las clemas miran hacia la derecha, de donde llegan los actuadores
-  const reles = modRelevadores();
-  reles.position.set(9.3, 0.08, TZC);
-  reles.rotation.y = Math.PI / 2;
-  gSensores.add(reles);
-  const etqRele = etiqueta('Relevadores 25 / 26 / 27');
-  etqRele.position.set(9.3, 3.6, TZC);
-  gSensores.add(etqRele);
+  // protoboard de 400 puntos con las tres etapas de transistor (una por actuador).
+  // Va girada: sus columnas corren en z y los cables de los actuadores llegan por la derecha
+  const protoPot = modProtoboard(30);
+  protoPot.position.set(9.3, 0.45, TZC);
+  protoPot.rotation.y = Math.PI / 2;
+  gSensores.add(protoPot);
+  [TZC + 2.3, TZC, TZC - 2.3].forEach(function (z) {      // canal 1 (GPIO25), 2 (GPIO26), 3 (GPIO27)
+    const e = modEtapa();
+    e.position.set(9.6, 0.875, z);
+    e.rotation.y = Math.PI / 2;
+    gSensores.add(e);
+  });
+  const etqPot = etiqueta('Transistores 25 / 26 / 27');
+  etqPot.position.set(9.3, 4.4, TZC);
+  gSensores.add(etqPot);
 
   // canaletas: las de piso terminan contra la vertical de su esquina
   gSensores.add(canaleta(-HX, 0, HZB + 0.9, -HX + 0.85, 0.75, HZF));       // piso, costado izquierdo
@@ -1200,36 +1256,51 @@ function main(){
   registrar('dht', montaje(modDHT22(), 'DHT22 · GPIO4', -HX + 1.6, 8.5, 10.6, { rotY: IZQ, pared: 1.6, etq: 3.6 }));
   registrar('polvo', montaje(modPolvo(), 'GP2Y1010 · 32 / 33', -11.4, 12.0, HZF - 1.8, { rotY: FRENTE, pared: 1.8, etq: 2.9 }));
 
-  // --- buhardilla: BH1750 bajo la ventana del hastial frontal
-  registrar('bh', montaje(modBH1750(), 'BH1750 · I2C 21 / 22', 0, 20.0, HZF - 1.0, { rotY: FRENTE, poste: 20.0 - 0.26 - yA, etq: 1.9 }));
+  // --- buhardilla: BH1750 junto a la ventana del hastial frontal (el centro lo ocupa el extractor)
+  registrar('bh', montaje(modBH1750(), 'BH1750 · I2C 21 / 22', -5.0, 20.0, HZF - 1.0, { rotY: FRENTE, poste: 20.0 - 0.26 - yA, etq: 1.9 }));
 
-  // --- actuadores: un extractor en cada ventana del costado derecho (el aire
-  // de reposición entra por las ventanas del izquierdo) y una sola alarma,
-  // LED + zumbador, en el hastial derecho de la buhardilla
-  const ventExtractor = modVentilador();
-  const ventExtractor2 = modVentilador();
+  // --- actuadores: extractor de 40 mm en la ventana baja del costado derecho,
+  // extractor de 60 mm pegado por dentro a la ventana del hastial frontal (más
+  // ancho que el vano, la tapa completa) y la alarma (zumbador) pegada al techo
+  const ventExtractor = modVentilador(40);
+  const ventExtractor2 = modVentilador(60);
   const moduloAlerta = modAlerta();
-  const YV_PB = VL.bajo[0] + 0.4, YV_PA = VL.alto[0] + 0.4;   // base de cada ventilador
+  const YV_PB = VL.bajo[0] + 0.4;                      // base del ventilador de planta baja
+  const YC_PA = 24.2, E_PA = 1.5;                      // centro y espesor del de 60 mm
   registrar('extractor', montaje(ventExtractor, 'Extractor PB · GPIO25', HX + T / 2, YV_PB - 0.05, 0, { rotY: IZQ, poste: 0, etq: 5.2 }));
-  registrar('extractor2', montaje(ventExtractor2, 'Extractor PA · GPIO26', HX + T / 2, YV_PA - 0.05, 0, { rotY: IZQ, poste: 0, etq: 4.8 }));
-  registrar('alerta', montaje(moduloAlerta, 'Alarma · GPIO27', HX - 1.4, 24.5, -6.0, { rotY: DER, pared: 1.4, etq: 3.4 }));
+  registrar('extractor2', montaje(ventExtractor2, 'Extractor PA · GPIO26', 0, YC_PA - 3.075, HZF - E_PA / 2 - 0.02, { poste: 0, etq: 6.6 }));
 
-  // placa adaptadora que tapa cada ventana alrededor del extractor
-  [YV_PB, YV_PA].forEach(function (yv, i) {
-    const y = i ? VL.alto : VL.bajo;
-    const s = arcoP(new THREE.Shape(), VL.z0, y[0], VL.z1, y[1]);
-    s.holes.push(rectH(-2.0, yv, 2.0, yv + 4.0));
+  // alarma pegada bajo el faldón delantero (cara inferior: y = TOP + (DH - z)·tan ANG)
+  const tanA = Math.tan(ANG), cosA = Math.cos(ANG), sinA = Math.sin(ANG);
+  const zTecho = function (y) { return DH - (y - TOP) / tanA; };
+  // punto a 'off' cm bajo la cara inferior del faldón delantero, a la altura y
+  const enTecho = function (x, y, off) { return [x, y - off * cosA, zTecho(y) - off * sinA]; };
+  const XAL = 9.0, YAL = 33.0;
+  const montAlerta = montaje(moduloAlerta, 'Alarma · GPIO27', XAL, 0, 0, { poste: 0, etq: 1.5 });
+  montAlerta.position.fromArray(enTecho(XAL, YAL, 0.21));
+  montAlerta.rotation.x = Math.PI + ANG;               // componentes hacia el interior
+  registrar('alerta', montAlerta);
+
+  // LED de estado pegado al muro derecho de la buhardilla (no pasa por transistor:
+  // lo maneja el ESP32 directo, así que no es un actuador de la simulación)
+  const ledEstado = modLedEstado();
+  gSensores.add(montaje(ledEstado, 'LED estado · RGB', HX - 0.22, 24.5, -6.0, { rotY: DER, poste: 0, etq: 1.7 }));
+
+  // placa adaptadora que tapa la ventana baja alrededor del extractor de 40 mm
+  (function () {
+    const s = arcoP(new THREE.Shape(), VL.z0, VL.bajo[0], VL.z1, VL.bajo[1]);
+    s.holes.push(rectH(-2.0, YV_PB, 2.0, YV_PB + 4.0));
     gSensores.add(aLado(pieza(s, 0.2, [mSoporte, mSoporte], 'adaptador_ventilador'), HX + T / 2 + 0.1));
-  });
+  })();
 
   // --- manojos de cable. Cada uno sale por la esquina trasera de su lado y
-  // termina en la protoboard (sensores) o en la clema de su relevador (actuadores)
+  // termina en la protoboard de sensores o en la etapa de transistor de su actuador
   function colaIzq(xc, zt, xt) {
     return [[xc, 0.4, HZB + 0.6], [xc, 0.4, HZB - 0.4], [xc + 0.3, 0.3, BZ0 - 0.2], [-17.4, 0.32, zt + 0.3], [-16.4, 0.95, zt], [xt, 0.95, zt]];
   }
-  const RELE = { x: 11.95, ch1: TZC + 2.3, ch2: TZC, ch3: TZC - 2.3 };
+  const ETAPA = { x: 11.4, ch1: TZC + 2.3, ch2: TZC, ch3: TZC - 2.3 };   // colector de cada etapa en la protoboard de 400
   function colaDer(xc, zc) {
-    return [[xc, 0.4, HZB + 0.6], [xc, 0.4, HZB - 0.4], [xc - 0.3, 0.3, BZ0 - 0.2], [14.2, 0.32, zc + 0.4], [12.9, 0.4, zc], [RELE.x, 0.9, zc]];
+    return [[xc, 0.4, HZB + 0.6], [xc, 0.4, HZB - 0.4], [xc - 0.3, 0.3, BZ0 - 0.2], [14.2, 0.32, zc + 0.4], [12.6, 0.5, zc], [ETAPA.x, 0.95, zc]];
   }
   const cables = [
     // planta baja, izquierda: bajan por el muro a la canaleta del piso y siguen hasta la esquina trasera
@@ -1243,21 +1314,30 @@ function main(){
       [-19.15, 0.4, 11.6]].concat(colaIzq(-19.15, TZC + 2.3, -15.6)),
      [CAB.rojo, CAB.negro, CAB.amarillo, CAB.azul]],                           // GP2Y1010
     // buhardilla: por el piso de la buhardilla a la canaleta vertical izquierda
-    [[[0, 19.55, HZF - 1.0], [-0.6, 18.75, 12.35], [-6.0, 18.68, 12.4], [-17.6, 18.68, 12.4], [-18.35, 18.68, 11.6], [-18.35, 18.68, -10.8],
+    [[[-5.0, 19.55, HZF - 1.0], [-5.6, 18.75, 12.35], [-8.0, 18.68, 12.4], [-17.6, 18.68, 12.4], [-18.35, 18.68, 11.6], [-18.35, 18.68, -10.8],
       [-18.6, 19.6, -12.2], [-18.6, 19.0, -12.7], [-18.6, 1.0, -12.7]].concat(colaIzq(-18.55, TZC - 0.5, -13.2)),
      [CAB.rojo, CAB.negro, CAB.amarillo, CAB.verde]],                          // BH1750
     // actuadores, derecha
-    [[[18.85, YV_PB + 0.2, 1.4], [RX, YV_PB - 0.6, 2.4], [RX, 1.4, 2.4], [18.95, 0.4, 1.9]].concat(colaDer(18.95, RELE.ch1)),
+    [[[18.85, YV_PB + 0.2, 1.4], [RX, YV_PB - 0.6, 2.4], [RX, 1.4, 2.4], [18.95, 0.4, 1.9]].concat(colaDer(18.95, ETAPA.ch1)),
      [CAB.rojo, CAB.negro]],                                                   // extractor PB -> canal 1
-    [[[18.85, YV_PA + 0.6, 1.4], [18.4, YV_PA - 0.6, 1.2], [18.4, 18.72, 0.2], [18.4, 18.72, -10.8],
-      [18.65, 19.6, -12.2], [18.65, 19.0, -12.7], [18.65, 1.4, -12.7]].concat(colaDer(18.65, RELE.ch2)),
+    // extractor PA: baja de la ventana frontal al piso de la buhardilla y sigue por el muro derecho
+    [[[2.6, YC_PA - 2.85, HZF - 0.75], [3.3, 18.8, 12.35], [6.0, 18.72, 12.4], [17.2, 18.72, 12.4], [17.9, 18.72, 11.6], [17.9, 18.72, -10.8],
+      [18.65, 19.6, -12.2], [18.65, 19.0, -12.7], [18.65, 1.4, -12.7]].concat(colaDer(18.65, ETAPA.ch2)),
      [CAB.rojo, CAB.negro]],                                                   // extractor PA -> canal 2
-    [[[18.0, 24.05, -6.0], [18.6, 23.7, -7.3], [RX, 23.0, -8.0], [RX, 18.75, -8.6], [RX, 18.72, -10.8],
-      [19.05, 19.6, -12.2], [19.05, 19.0, -12.75], [19.05, 1.0, -12.75]].concat(colaDer(19.05, RELE.ch3)),
+    // alarma: por el techo hasta el muro derecho, baja por él y sigue por el piso
+    [[enTecho(XAL + 1.95, YAL, 0.42), enTecho(XAL + 3.4, YAL, 0.25), enTecho(18.2, YAL, 0.25),
+      [RX, YAL - 0.5, zTecho(YAL) - 0.45], [RX, YAL - 1.6, zTecho(YAL) - 0.45], [RX, 19.3, zTecho(YAL) - 0.45], [RX, 18.75, zTecho(YAL) - 1.1], [RX, 18.72, -10.8],
+      [19.05, 19.6, -12.2], [19.05, 19.0, -12.75], [19.05, 1.0, -12.75]].concat(colaDer(19.05, ETAPA.ch3)),
      [CAB.rojo, CAB.negro, CAB.naranja]],                                      // alarma -> canal 3
-    // del ESP32 a las entradas del módulo de relevadores
-    [[[-0.6, 1.15, TZC + 1.1], [1.4, 0.7, TZC + 3.1], [5.0, 0.35, TZC + 4.3], [10.6, 0.35, TZC + 4.4], [11.75, 0.35, TZC + 3.6]],
-     [CAB.naranja, CAB.blanco, CAB.morado, CAB.rojo, CAB.negro]]
+    // LED de estado: baja por el muro derecho, sale por la esquina y va directo a la protoboard (R, G, GND)
+    [[[HX - 0.2, 23.6, -6.0], [HX - 0.15, 22.4, -6.0], [HX - 0.15, 19.5, -6.0], [18.45, 18.78, -6.9], [18.45, 18.72, -10.8],
+      [18.85, 19.6, -12.2], [18.85, 19.0, -12.72], [18.85, 1.2, -12.72], [18.85, 0.4, HZB + 0.6], [18.85, 0.4, HZB - 0.4],
+      [18.55, 0.45, BZ0 - 0.2], [16.8, 0.6, TZC - 2.6], [14.6, 0.4, TZC - 4.3], [5.0, 0.35, TZC - 4.3], [-1.2, 0.35, TZC - 4.25],
+      [-6.0, 0.5, TZC - 3.4], [-6.6, 0.95, TZC - 2.3]],
+     [CAB.rojo, CAB.verde, CAB.negro]],
+    // del ESP32 a las bases de los transistores (GPIO25, 26, 27) y tierra común
+    [[[-0.6, 1.15, TZC + 1.1], [1.4, 0.7, TZC + 3.1], [4.6, 0.5, TZC + 3.7], [6.6, 0.75, TZC + 3.0], [7.3, 0.95, TZC + 2.3]],
+     [CAB.naranja, CAB.blanco, CAB.morado, CAB.negro]]
   ];
   cables.forEach(function (c) { gSensores.add(manojo(c[0], c[1])); });
 
@@ -1390,7 +1470,7 @@ function main(){
   const ACTS = [
     { id: 'extractor',   nombre: 'Extractor PB',          gpio: 25 },
     { id: 'extractor2',  nombre: 'Extractor PA',          gpio: 26 },
-    { id: 'alerta',      nombre: 'Alarma (LED + buzzer)', gpio: 27 }
+    { id: 'alerta',      nombre: 'Alarma (buzzer)',       gpio: 27 }
   ];
 
   const ESCENARIOS = {
@@ -1405,7 +1485,7 @@ function main(){
   const sim = {
     corriendo: false, t0: 0, ultimo: 0, modo: 'auto',
     valores: {}, act: {}, vel: { extractor: 0, extractor2: 0 },
-    destello: 0, sonido: false, mqtt: false, faseAlerta: false
+    destello: 0, sonido: false, mqtt: false, faseAlerta: false, estado: null
   };
   ACTS.forEach(function (a) { sim.act[a.id] = false; });
 
@@ -1535,7 +1615,6 @@ function main(){
     filasAct[a.id] = { fila: fila, pill: pill, boton: b };
   });
 
-  const ledsRele = reles.userData.leds;
   function pintarActuadores() {
     ACTS.forEach(function (a, i) {
       const on = sim.act[a.id];
@@ -1544,7 +1623,6 @@ function main(){
       f.pill.classList.toggle('on', on);
       f.boton.disabled = !sim.corriendo || sim.modo !== 'manual';
       f.boton.title = f.boton.disabled ? 'Disponible en modo manual con la simulación en marcha' : '';
-      ledsRele[i].emissiveIntensity = on ? 1.6 : 0.04;
     });
   }
 
@@ -1573,6 +1651,7 @@ function main(){
   // ---- estado general
   const insignia = document.getElementById('sim-estado');
   function pintarEstado(n) {
+    sim.estado = n;
     if (n === null) { insignia.removeAttribute('data-nivel'); insignia.textContent = 'Detenida'; return; }
     insignia.dataset.nivel = n;
     insignia.textContent = NIVELES[n];
@@ -1621,7 +1700,7 @@ function main(){
   }
   function detener() {
     sim.corriendo = false;
-    ACTS.forEach(function (a) { sim.act[a.id] = false; });   // sin energía, los relevadores se liberan
+    ACTS.forEach(function (a) { sim.act[a.id] = false; });   // sin señal en la base, los transistores se cortan
     log('— simulación detenida —', 'sis');
     btnPlay.textContent = '▶ Iniciar';
     pintarEstado(null);
@@ -1703,8 +1782,9 @@ function main(){
 
   // ---- animación de actuadores (se llama desde el bucle de render)
   const ledEsp = esp.userData.ledAzul;
-  const ledAlerta = moduloAlerta.userData.led;
-  const luzAlerta = moduloAlerta.userData.luz;
+  const ledRgb = ledEstado.userData.led;
+  const luzRgb = ledEstado.userData.luz;
+  const COLOR_ESTADO = [0x2fd05a, 0xffb21a, 0xff2a17];   // buena, aceptable, crítica
   function actualizarSim(dt, ahora) {
     if (sim.corriendo && ahora - sim.ultimo >= PERIODO_MS) {
       sim.ultimo = ahora;
@@ -1718,8 +1798,15 @@ function main(){
     const fase = sim.act.alerta && (ahora / 1000 * 2.5) % 1 < 0.5;
     if (fase && !sim.faseAlerta) pitido();
     sim.faseAlerta = fase;
-    ledAlerta.emissiveIntensity = fase ? 2.4 : 0.06;
-    luzAlerta.intensity = fase ? 1.3 : 0;
+    // como el firmware: color de la calidad; con la alarma activa, rojo parpadeando con el zumbador
+    const encendido = sim.corriendo && sim.estado !== null;
+    const col = sim.act.alerta ? COLOR_ESTADO[2] : (encendido ? COLOR_ESTADO[sim.estado] : 0x000000);
+    const brilla = encendido && (!sim.act.alerta || fase);
+    ledRgb.color.setHex(brilla ? col : 0xe9ebee);         // difusor teñido para que no se lave a blanco
+    ledRgb.emissive.setHex(col);
+    ledRgb.emissiveIntensity = brilla ? 0.9 : 0.05;
+    luzRgb.color.setHex(col);
+    luzRgb.intensity = brilla ? 1.0 : 0;
     sim.destello = Math.max(0, sim.destello - dt);
     ledEsp.emissiveIntensity = sim.destello > 0 ? 2.2 : (sim.corriendo ? 0.25 : 0.04);
   }
