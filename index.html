@@ -1270,21 +1270,22 @@ function main(){
   registrar('extractor', montaje(ventExtractor, 'Extractor PB · GPIO25', HX + T / 2, YV_PB - 0.05, 0, { rotY: IZQ, poste: 0, etq: 5.2 }));
   registrar('extractor2', montaje(ventExtractor2, 'Extractor PA · GPIO26', 0, YC_PA - 3.075, HZF - E_PA / 2 - 0.02, { poste: 0, etq: 6.6 }));
 
-  // alarma pegada bajo el faldón delantero (cara inferior: y = TOP + (DH - z)·tan ANG)
+  // alarma (zumbador) pegada bajo el faldón trasero, en la franja angosta entre
+  // la cumbrera y el hueco. Cara inferior del faldón: y = TOP + (DH - |z|)·tan ANG
   const tanA = Math.tan(ANG), cosA = Math.cos(ANG), sinA = Math.sin(ANG);
-  const zTecho = function (y) { return DH - (y - TOP) / tanA; };
-  // punto a 'off' cm bajo la cara inferior del faldón delantero, a la altura y
-  const enTecho = function (x, y, off) { return [x, y - off * cosA, zTecho(y) - off * sinA]; };
-  const XAL = 9.0, YAL = 33.0;
+  const zTecho = function (y) { return -(DH - (y - TOP) / tanA); };   // z (< 0) bajo el faldón trasero
+  // punto a 'off' cm bajo la cara inferior del faldón trasero, a la altura y
+  const enTecho = function (x, y, off) { return [x, y - off * cosA, zTecho(y) + off * sinA]; };
+  const XAL = 9.0, YAL = 37.5;
   const montAlerta = montaje(moduloAlerta, 'Alarma · GPIO27', XAL, 0, 0, { poste: 0, etq: 1.5 });
   montAlerta.position.fromArray(enTecho(XAL, YAL, 0.21));
-  montAlerta.rotation.x = Math.PI + ANG;               // componentes hacia el interior
+  montAlerta.rotation.x = Math.PI - ANG;               // componentes hacia el interior
   registrar('alerta', montAlerta);
 
-  // LED de estado pegado al muro derecho de la buhardilla (no pasa por transistor:
+  // LED de estado pegado al muro izquierdo de la buhardilla (no pasa por transistor:
   // lo maneja el ESP32 directo, así que no es un actuador de la simulación)
   const ledEstado = modLedEstado();
-  gSensores.add(montaje(ledEstado, 'LED estado · RGB', HX - 0.22, 24.5, -6.0, { rotY: DER, poste: 0, etq: 1.7 }));
+  gSensores.add(montaje(ledEstado, 'LED estado · RGB', -HX + 0.22, 24.5, -6.0, { rotY: IZQ, poste: 0, etq: 1.7 }));
 
   // placa adaptadora que tapa la ventana baja alrededor del extractor de 40 mm
   (function () {
@@ -1324,16 +1325,14 @@ function main(){
     [[[2.6, YC_PA - 2.85, HZF - 0.75], [3.3, 18.8, 12.35], [6.0, 18.72, 12.4], [17.2, 18.72, 12.4], [17.9, 18.72, 11.6], [17.9, 18.72, -10.8],
       [18.65, 19.6, -12.2], [18.65, 19.0, -12.7], [18.65, 1.4, -12.7]].concat(colaDer(18.65, ETAPA.ch2)),
      [CAB.rojo, CAB.negro]],                                                   // extractor PA -> canal 2
-    // alarma: por el techo hasta el muro derecho, baja por él y sigue por el piso
+    // alarma: por el techo hasta el muro derecho, baja por él (por detrás de la ventana alta) y sigue por el piso
     [[enTecho(XAL + 1.95, YAL, 0.42), enTecho(XAL + 3.4, YAL, 0.25), enTecho(18.2, YAL, 0.25),
-      [RX, YAL - 0.5, zTecho(YAL) - 0.45], [RX, YAL - 1.6, zTecho(YAL) - 0.45], [RX, 19.3, zTecho(YAL) - 0.45], [RX, 18.75, zTecho(YAL) - 1.1], [RX, 18.72, -10.8],
+      [RX, YAL - 0.6, zTecho(YAL) + 0.45], [RX, 33.0, -3.4], [RX, 19.3, -3.4], [RX, 18.75, -4.0], [RX, 18.72, -10.8],
       [19.05, 19.6, -12.2], [19.05, 19.0, -12.75], [19.05, 1.0, -12.75]].concat(colaDer(19.05, ETAPA.ch3)),
      [CAB.rojo, CAB.negro, CAB.naranja]],                                      // alarma -> canal 3
-    // LED de estado: baja por el muro derecho, sale por la esquina y va directo a la protoboard (R, G, GND)
-    [[[HX - 0.2, 23.6, -6.0], [HX - 0.15, 22.4, -6.0], [HX - 0.15, 19.5, -6.0], [18.45, 18.78, -6.9], [18.45, 18.72, -10.8],
-      [18.85, 19.6, -12.2], [18.85, 19.0, -12.72], [18.85, 1.2, -12.72], [18.85, 0.4, HZB + 0.6], [18.85, 0.4, HZB - 0.4],
-      [18.55, 0.45, BZ0 - 0.2], [16.8, 0.6, TZC - 2.6], [14.6, 0.4, TZC - 4.3], [5.0, 0.35, TZC - 4.3], [-1.2, 0.35, TZC - 4.25],
-      [-6.0, 0.5, TZC - 3.4], [-6.6, 0.95, TZC - 2.3]],
+    // LED de estado: baja por el muro izquierdo y entra a la canaleta vertical izquierda (R, G, GND)
+    [[[-HX + 0.2, 23.6, -6.0], [-HX + 0.15, 22.4, -6.0], [-HX + 0.15, 19.5, -6.0], [-19.0, 18.75, -6.9], [-19.0, 18.72, -10.8],
+      [-18.9, 19.6, -12.2], [-18.9, 19.0, -12.72], [-18.9, 1.2, -12.72]].concat(colaIzq(-18.9, TZC - 1.2, -12.6)),
      [CAB.rojo, CAB.verde, CAB.negro]],
     // del ESP32 a las bases de los transistores (GPIO25, 26, 27) y tierra común
     [[[-0.6, 1.15, TZC + 1.1], [1.4, 0.7, TZC + 3.1], [4.6, 0.5, TZC + 3.7], [6.6, 0.75, TZC + 3.0], [7.3, 0.95, TZC + 2.3]],
